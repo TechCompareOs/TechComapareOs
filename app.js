@@ -175,7 +175,7 @@ async function handleAuth(event) {
     const { error } = await supabaseClient.auth.signInWithOtp({ 
       email: email,
       options: {
-        emailRedirectTo: window.location.href
+        emailRedirectTo: 'https://techcompareos.github.io/TechComapareOs/'
       }
     });
     
