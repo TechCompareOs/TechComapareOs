@@ -203,7 +203,7 @@ function updateAuthUI(user) {
   if (user) {
     const studentNum = (user.email || 'Student').split('@')[0];
     container.innerHTML = `
-      <span class="user-badge">👤 ${studentNum}</span>
+      <span class="user-badge"> ${studentNum}</span>
       <button class="btn-primary" onclick="logoutUser()">Log Out</button>
     `;
   } else {
@@ -344,7 +344,7 @@ async function checkAuthSession() {
     if (event === 'SIGNED_IN' && session) {
       currentUser = session.user;
       updateAuthUI(currentUser);
-      alert('✨ Successfully signed in as ' + currentUser.email);
+      alert('Successfully signed in as ' + currentUser.email);
       
       // Close modal and take them to the marketplace
       const modal = document.getElementById('authModal');
