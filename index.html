@@ -1,0 +1,242 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TechCompare OS | Live Campus Platform</title>
+  
+  <!-- CSS Stylesheet -->
+  <link rel="stylesheet" href="Style.css" />
+
+  <!-- Supabase SDK CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+</head>
+<body>
+
+  <!-- Header Navigation -->
+  <header>
+    <div class="brand-container" onclick="switchTab('home')">
+      <div class="brand-text">TechCompare <span>OS</span></div>
+    </div>
+
+    <nav>
+      <button class="active" id="nav-home" onclick="switchTab('home')">Home</button>
+      <button id="nav-marketplace" onclick="switchTab('marketplace')">Marketplace</button>
+      <button id="nav-tradein" onclick="switchTab('tradein')">Trade-In Estimator</button>
+      <button id="nav-advisor" onclick="switchTab('advisor')">AI Advisor</button>
+      <button id="nav-sell" onclick="switchTab('sell')">Sell Device</button>
+      
+      <!-- Authentication Container -->
+      <div id="authStatus" style="margin-left: 0.5rem;">
+        <button class="btn-primary" onclick="openAuthModal()">Sign In</button>
+      </div>
+    </nav>
+  </header>
+
+  <!-- Live Activity Bar -->
+  <div class="activity-bar">
+    <div><span class="pulse-indicator"></span> <strong>Campus Platform:</strong> <span id="activeListingsCount">4 verified devices listed</span></div>
+    <div style="font-size:0.8rem; opacity:0.8;">Strictly for verified TUT students</div>
+  </div>
+
+  <main>
+    <div class="container">
+
+      <!-- HOME TAB -->
+      <div id="home" class="tab-section active">
+        <div id="loggedOutNotice" class="access-notice">
+          <span><strong>Access Notice:</strong> You are currently exploring as a guest. Please sign in with your TUT email to access the Marketplace, Trade-In Estimator, and Selling Portal.</span>
+          <button onclick="openAuthModal()" style="padding:0.4rem 0.8rem; background:var(--tut-blue); color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Sign In</button>
+        </div>
+
+        <div class="hero-banner">
+          <h1>Welcome to <span>TechCompare OS</span></h1>
+          <p>The verified TUT campus marketplace for buying, selling, and trading laptops, tablets, and mobile devices safely.</p>
+          <div class="hero-buttons">
+            <button class="btn-hero" onclick="switchTab('marketplace')">Explore Marketplace</button>
+            <button class="btn-hero-outline" onclick="openAuthModal()">Create Account</button>
+          </div>
+        </div>
+
+        <div class="grid feature-grid">
+          <div class="form-box" style="text-align:center;">
+            <h3 style="color:var(--tut-blue); margin-bottom:0.5rem;">Verified Student Accounts</h3>
+            <p style="font-size:0.9rem; color:#666;">Strict verification via <code>@tut4life.ac.za</code> student emails keeps fraudulent listings and scams off the platform.</p>
+          </div>
+          <div class="form-box" style="text-align:center;">
+            <h3 style="color:var(--tut-blue); margin-bottom:0.5rem;">Trade-In Valuation</h3>
+            <p style="font-size:0.9rem; color:#666;">Calculate fair trade credit for your current device using official depreciation formulas.</p>
+          </div>
+          <div class="form-box" style="text-align:center;">
+            <h3 style="color:var(--tut-blue); margin-bottom:0.5rem;">AI Advisor Agent</h3>
+            <p style="font-size:0.9rem; color:#666;">Ask questions to find laptop specs, price checks, and course hardware requirements.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- MARKETPLACE TAB -->
+      <div id="marketplace" class="tab-section">
+        <h2 style="color: var(--tut-blue); margin-bottom: 1rem;">Campus Marketplace</h2>
+        
+        <!-- Single Filter Bar -->
+        <div class="filter-bar">
+          <input type="text" id="searchInput" placeholder="Search devices (e.g., iPhone, Lenovo)..." onkeyup="filterListings()" />
+          <select id="categoryFilter" onchange="filterListings()">
+            <option value="All">All Categories</option>
+            <option value="Laptop">Laptops</option>
+            <option value="Phone">Phones</option>
+            <option value="Tablet">Tablets</option>
+          </select>
+          <select id="sortFilter" onchange="filterListings()">
+            <option value="featured">Sort By: Featured</option>
+            <option value="low">Price: Low to High</option>
+            <option value="high">Price: High to Low</option>
+          </select>
+        </div>
+
+        <div id="marketplace-container" class="grid">
+          <!-- Device cards rendered by app.js -->
+        </div>
+      </div>
+
+      <!-- TRADE-IN TAB -->
+      <div id="tradein" class="tab-section">
+        <div class="form-box">
+          <h2 style="color:var(--tut-blue); margin-bottom:0.5rem;">Trade-In Value Estimator</h2>
+          <p style="font-size:0.85rem; color:#6c757d; margin-bottom:1.2rem;">Calculate estimated trade credit based on age and device condition.</p>
+
+          <div class="form-group">
+            <label>Original Retail Price (R)</label>
+            <input type="number" id="tradePrice" placeholder="e.g. 7500">
+          </div>
+
+          <div class="form-group">
+            <label>Age of Device (months)</label>
+            <input type="number" id="tradeAge" placeholder="e.g. 12">
+          </div>
+
+          <div class="form-group">
+            <label>Device Condition</label>
+            <select id="tradeCondition">
+              <option value="1.0">Like New / Good (100%)</option>
+              <option value="0.8">Fair (Minor wear - 80%)</option>
+              <option value="0.5">Poor (Visible wear - 50%)</option>
+            </select>
+          </div>
+
+          <button class="btn-action" onclick="runTradeInCalc()">Calculate Estimated Credit</button>
+          <div id="tradeResult" class="result-alert" hidden></div>
+        </div>
+      </div>
+
+      <!-- AI ADVISOR TAB -->
+      <div id="advisor" class="tab-section">
+        <div class="form-box">
+          <h2 style="color:var(--tut-blue); margin-bottom:0.5rem;">AI Course & Spec Matcher</h2>
+          <p style="font-size:0.85rem; color:#6c757d; margin-bottom:1.2rem;">Match course hardware requirements against your budget limit.</p>
+
+          <div class="form-group">
+            <label>Your Maximum Budget (R)</label>
+            <input type="number" id="advisorBudget" placeholder="e.g. 5500">
+          </div>
+
+          <div class="form-group">
+            <label>Enrolled Program</label>
+            <select id="advisorProgram">
+              <option value="cs">Computer Science / Software Engineering</option>
+              <option value="it">Information Technology / Support</option>
+              <option value="gen">General Studies / Humanities</option>
+            </select>
+          </div>
+
+          <button class="btn-action" onclick="runAdvisorMatch()">Get AI Recommendation</button>
+          <div id="advisorResult" class="result-alert" hidden></div>
+        </div>
+      </div>
+
+      <!-- SELL TAB -->
+      <div id="sell" class="tab-section">
+        <div class="form-box">
+          <h2 style="color:var(--tut-blue); margin-bottom:0.5rem;">List Your Device for Sale</h2>
+          <p style="font-size:0.85rem; color:#6c757d; margin-bottom:1.2rem;">Post your device to verified TUT students on campus.</p>
+
+          <div class="form-group">
+            <label>Device Model Name</label>
+            <input type="text" id="sellTitle" placeholder="e.g. Lenovo IdeaPad Slim 3">
+          </div>
+
+          <div class="form-group">
+            <label>Category</label>
+            <select id="sellCategory">
+              <option value="Laptop">Laptop</option>
+              <option value="Phone">Phone</option>
+              <option value="Tablet">Tablet</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Brand</label>
+            <input type="text" id="sellBrand" placeholder="e.g. Lenovo, Apple, HP">
+          </div>
+
+          <div class="form-group">
+            <label>Asking Price (R)</label>
+            <input type="number" id="sellPrice" placeholder="e.g. 4200">
+          </div>
+
+          <button class="btn-action" onclick="createNewListing()">Publish to Campus Marketplace</button>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- UNIFIED AUTHENTICATION MODAL -->
+  <div class="modal-overlay" id="authModal">
+    <div class="modal-card">
+      <button class="modal-close" onclick="closeAuthModal()">&times;</button>
+      <h2 id="modalTitle" style="color:var(--tut-blue); margin-bottom:0.3rem;">Student Sign In</h2>
+      <p class="modal-sub">Use your verified TUT student email (@tut4life.ac.za)</p>
+
+      <form id="authForm" onsubmit="handleAuth(event)">
+        <div class="form-group">
+          <label>TUT Email Address</label>
+          <input type="email" id="authEmail" placeholder="e.g. 218000000@tut4life.ac.za" required>
+        </div>
+
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="authPassword" placeholder="••••••••" required>
+        </div>
+
+        <button type="submit" class="btn-action" style="margin-top:1rem;" id="authSubmitBtn">Send Magic Link</button>
+      </form>
+
+      <div class="auth-toggle">
+        <span id="toggleText">Don't have an account?</span>
+        <a href="#" onclick="toggleAuthMode(event)" id="toggleBtn">Register here</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI CHATBOT WIDGET -->
+  <div class="ai-agent-panel">
+    <div class="ai-agent-header">
+      <div>TechCompare AI Agent <span class="ai-agent-status">ONLINE</span></div>
+      <span style="cursor:pointer;" onclick="toggleBot()">−</span>
+    </div>
+    <div id="botContent">
+      <div class="ai-agent-body" id="botChatLogs">
+        <div class="bot-msg bot">Hello! I am your AI Campus Agent. How can I help you today?</div>
+      </div>
+      <form class="ai-agent-footer" onsubmit="handleBotQuery(event)">
+        <input type="text" id="botInput" placeholder="Ask AI agent...">
+        <button type="submit" class="ai-btn">Send</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- External Application Logic Script -->
+  <script src="app.js"></script>
+</body>
+</html>
