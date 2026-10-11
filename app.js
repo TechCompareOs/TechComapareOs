@@ -612,45 +612,33 @@ document.addEventListener('click', event => {
   if (chatBtn) openChat(chatBtn.dataset.seller, chatBtn.dataset.product);
 });
 
-// === Handle Magic link redeem & session on load ===
 async function checkAuthSession() {
-  if (!supabaseClient) return;
+  if (!supabaseClient || !supabaseClient.auth) return;
 
-  // handle implicit has tokens from magic link redirect
-
-  const hash = window.location.hash;
-  if(hash && hash.includes('access_token')){
-    const params = new URLSearchParams(hash.substring(1));
-    const accessToken = params.get('access_token');
-    const refreshToken = param.get('refresh_token');
-
-
-    if (accessToken && refreshToken) {
-      await supabaseClient.auth.setSession({
-        access_token: accessToken,
-        refresh_token: refreshToken
-      });
-      // clean up the url hash
-      window.history.replaceState({}, document.title, window.location.pathme);
+  try {
+    const { data } = await supabaseClient.auth.getSession();
+    if (data?.session?.user) {
+      currentUser = data.session.user;
+      updateAuthUI(currentUser);
+      filterListings();
     }
+  } catch (error) {
+    console.warn('Supabase session check failed:', error);
   }
-  //check standard session
-  const { data: {session } } = await supabaseClient.auth.getSession();
-  if (data?.session?.user) {
-    currentUser = session.user;
-    updateAuthUI(currentUser);
-  }
-  
+
   supabaseClient.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_IN' && session) {
       currentUser = session.user;
       updateAuthUI(currentUser);
-      const modal = document.getElementById('authModal');
-      if (modal) modal.style.display = 'none;
-      if (typeof switchTab === 'function') switchTab('marketplace');
+      closeAuthModal();
+      filterListings();
+      const home = document.getElementById('home');
+      if (home && home.classList.contains('active')) switchTab('marketplace');
     } else if (event === 'SIGNED_OUT') {
+      teardownChatSubscription();
       currentUser = null;
       updateAuthUI(null);
+      filterListings();
     }
   });
 }
