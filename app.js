@@ -3,22 +3,16 @@ const SUPABASE_URL = "https://hizmjehkwbgmrlxezvcl.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_NvyZ8UYqTfZ5kQOhI87z0w_tOBpX9Ha";
 
 let supabaseClient = null;
-// Initialize Supabase Client safely
 if (window.supabase && typeof window.supabase.createClient  === 'function') {
   supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 } else if (typeof supabase !== 'undefined' && typeof supabase.createClient === 'function') {
   supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 }
 
-let localListings = [
-  { id: 1, name: 'Lenovo IdeaPad Slim 3', category: 'Laptop', brand: 'Lenovo', price: 4200, retail_price: 6999, seller_id: '218002931', rating: 4.8 },
-  { id: 2, name: 'Samsung Galaxy A24 128GB', category: 'Phone', brand: 'Samsung', price: 2100, retail_price: 3499, seller_id: '219084112', rating: 4.2 },
-  { id: 3, name: 'Apple iPhone 15 128GB', category: 'Phone', brand: 'Apple', price: 11500, retail_price: 15999, seller_id: '220048129', rating: 5.0 },
-  { id: 4, name: 'HP 15 Intel Core i3', category: 'Laptop', brand: 'HP', price: 3800, retail_price: 5800, seller_id: '217039201', rating: 4.0 }
-];
-
 let currentUser = null;
 let isSignUpMode = false;
+let activeChatPartner = null;
+let activeProductId = null;
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, character => ({
@@ -30,67 +24,7 @@ function escapeHtml(value) {
   })[character]);
 }
 
-function renderListings(items) {
-  const container = document.getElementById('marketplace-container');
-  const countEl = document.getElementById('activeListingsCount');
-
-  if (countEl) countEl.textContent = `${(items || []).length} verified devices listed`;
-  if (!container) return;
-
-  if (!items || items.length === 0) {
-    container.innerHTML = '<p style="grid-column: 1/-1; text-align:center; padding:2rem; color:#6c757d;">No listings found matching your search.</p>';
-    return;
-  }
-
-  container.innerHTML = items.map(item => {
-    const savings = Math.max(0, (item.retail_price || item.price) - item.price);
-    const retailValue = item.retail_price || item.price;
-    const percentOff = retailValue ? Math.round((savings / retailValue) * 100) : 0;
-
-    return `
-      <div class="listing-card">
-        <div class="card-header">
-          <span class="card-tag">${escapeHtml(item.category)}</span>
-          ${savings > 0 ? `<span class="savings-badge">Save R${savings.toLocaleString()} (${percentOff}% off)</span>` : ''}
-        </div>
-        <h3>${escapeHtml(item.name)}</h3>
-        <p><strong>Brand:</strong> ${escapeHtml(item.brand)}</p>
-        <p class="price">
-          R ${Number(item.price || 0).toLocaleString()}
-          <span class="retail">R ${Number(retailValue || 0).toLocaleString()}</span>
-        </p>
-        <p class="seller">Seller ID: ${escapeHtml(item.seller_id)} | ★ ${Number(item.rating) || 0}</p>
-        <button class="btn-primary" data-seller="${escapeHtml(item.seller_id)}" data-device="${escapeHtml(item.name)}">Contact Seller</button>
-      </div>
-    `;
-  }).join('');
-}
-
-function filterListings() {
-  const searchInput = document.getElementById('searchInput');
-  const categoryFilter = document.getElementById('categoryFilter');
-  const sortFilter = document.getElementById('sortFilter');
-
-  if (!searchInput || !categoryFilter) return;
-
-  const query = searchInput.value.trim().toLowerCase();
-  const selectedCategory = categoryFilter.value;
-  const sort = sortFilter ? sortFilter.value : 'featured';
-
-  let filtered = localListings.filter(item => {
-    const name = (item.name || '').toLowerCase();
-    const brand = (item.brand || '').toLowerCase();
-    const matchesSearch = !query || name.includes(query) || brand.includes(query);
-    const matchesCategory = selectedCategory === 'All' || item.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
-
-  if (sort === 'low') filtered.sort((a, b) => a.price - b.price);
-  if (sort === 'high') filtered.sort((a, b) => b.price - a.price);
-
-  renderListings(filtered);
-}
-
+// --- AUTH & UI HELPERS ---
 function switchTab(tabId) {
   const section = document.getElementById(tabId);
   if (!section) return;
@@ -109,7 +43,8 @@ function switchTab(tabId) {
   if (navBtn) navBtn.classList.add('active');
 }
 
-function openAuthModal() {
+function openAuthModal(signUp = false) {
+  isSignUpMode = signUp;
   const modal = document.getElementById('authModal');
   if (modal) modal.style.display = 'flex';
 }
@@ -119,29 +54,37 @@ function closeAuthModal() {
   if (modal) modal.style.display = 'none';
 }
 
-function toggleAuthMode(event) {
-  if (event) event.preventDefault();
-  isSignUpMode = !isSignUpMode;
+async function logoutUser() {
+  if (supabaseClient && supabaseClient.auth) {
+    await supabaseClient.auth.signOut();
+  }
+  currentUser = null;
+  updateAuthUI(null);
+  switchTab('home');
+  alert('You have logged out.');
+}
 
-  const modalTitle = document.getElementById('modalTitle');
-  const submitBtn = document.getElementById('authSubmitBtn');
-  const toggleText = document.getElementById('toggleText');
-  const toggleBtn = document.getElementById('toggleBtn');
+function updateAuthUI(user) {
+  const container = document.getElementById('authStatus');
+  const notice = document.getElementById('loggedOutNotice');
 
-  if (isSignUpMode) {
-    if (modalTitle) modalTitle.innerText = 'Create Student Account';
-    if (submitBtn) submitBtn.innerText = 'Sign Up with Magic Link';
-    if (toggleText) toggleText.innerText = 'Already have an account?';
-    if (toggleBtn) toggleBtn.innerText = 'Log in here';
+  if (notice) notice.style.display = user ? 'none' : 'flex';
+  if (!container) return;
+
+  if (user) {
+    const studentNum = (user.email || 'Student').split('@')[0];
+    container.innerHTML = `
+      <span class="user-badge">👤 ${studentNum}</span>
+      <button class="btn-primary" onclick="logoutUser()">Log Out</button>
+    `;
   } else {
-    if (modalTitle) modalTitle.innerText = 'Student Sign In';
-    if (submitBtn) submitBtn.innerText = 'Sign In with Magic Link';
-    if (toggleText) toggleText.innerText = "Don't have an account?";
-    if (toggleBtn) toggleBtn.innerText = 'Register here';
+    container.innerHTML = `
+      <button class="btn-primary" onclick="openAuthModal()">Sign In</button>
+    `;
   }
 }
 
-// --- Function to handle Magic Link Authentication ---
+// --- MAGIC LINK AUTH ---
 async function handleAuth(event) {
   if (event) event.preventDefault();
 
@@ -166,22 +109,20 @@ async function handleAuth(event) {
   submitBtn.disabled = true;
 
   try {
-    // Direct check on supabaseClient
     if (!supabaseClient || !supabaseClient.auth) {
-      throw new Error("Supabase client is not initialized. Check your CDN script tags.");
+      throw new Error("Supabase client is not initialized.");
     }
 
-    // Request Magic Link from Supabase
     const { error } = await supabaseClient.auth.signInWithOtp({ 
       email: email,
       options: {
-        emailRedirectTo: 'https://techcompareos.github.io/TechComapareOs/'
+        emailRedirectTo: 'https://techcompareos.github.io/TechCompareOs/'
       }
     });
     
     if (error) throw error;
     
-    alert('Magic link sent! Please check your TUT email inbox and click the link to log in.');
+    alert('Magic link sent! Please check your TUT email inbox.');
     closeAuthModal();
 
   } catch (err) {
@@ -192,227 +133,67 @@ async function handleAuth(event) {
   }
 }
 
-
-function updateAuthUI(user) {
-  const container = document.getElementById('authStatus');
-  const notice = document.getElementById('loggedOutNotice');
-
-  if (notice) notice.style.display = user ? 'none' : 'flex';
-  if (!container) return;
-
-  if (user) {
-    const studentNum = (user.email || 'Student').split('@')[0];
-    container.innerHTML = `
-      <span class="user-badge">👤 ${studentNum}</span>
-      <button class="btn-primary" onclick="logoutUser()">Log Out</button>
-    `;
-  } else {
-    container.innerHTML = `
-      <button class="btn-primary" onclick="openAuthModal()">Sign In</button>
-    `;
-  }
-}
-function openAuthModal(signUp = false)
-{
-  isSignUpMode = signUp;
-  
-  const modal = document.getElementById('authModal');
-  const modalTitle = document.getElementById('modalTitle');
-  const submitBtn = document.getElementById('authSubmitBtn');
-  const toggleText = document.getElementById('toggleText');
-  const toggleBtn = document.getElementById('toggleBtn');
-
- if (modal) modal.style.display = 'flex';
-
-  if (isSignUpMode) {
-    if (modalTitle) modalTitle.innerText = 'Create Student Account';
-    if (submitBtn) submitBtn.innerText = 'Sign Up with Magic Link';
-    if (toggleText) toggleText.innerText = 'Already have an account?';
-    if (toggleBtn) toggleBtn.innerText = 'Log in here';
-  } else {
-    if (modalTitle) modalTitle.innerText = 'Student Sign In';
-    if (submitBtn) submitBtn.innerText = 'Sign In with Magic Link';
-    if (toggleText) toggleText.innerText = "Don't have an account?";
-    if (toggleBtn) toggleBtn.innerText = 'Register here';
-  }
-}
-async function logoutUser() {
-  if (supabaseClient && supabaseClient.auth) {
-    await supabaseClient.auth.signOut();
-  }
-  currentUser = null;
-  updateAuthUI(null);
-  switchTab('home');
-  alert('You have logged out.');
-}
-
-function contactSeller(sellerId, deviceName) {
-  alert(`Connecting to seller (${sellerId}) regarding device: ${deviceName}`);
-}
-
-function runTradeInCalc() {
-  const price = Number(document.getElementById('tradePrice').value);
-  const age = Number(document.getElementById('tradeAge').value);
-  const condition = Number(document.getElementById('tradeCondition').value);
-  const result = document.getElementById('tradeResult');
-
-  if (!Number.isFinite(price) || price <= 0 || !Number.isFinite(age) || age < 0) {
-    alert('Please enter a valid price and age.');
-    return;
-  }
-
-  const baseValue = Math.max(price * 0.15, price * (1 - age * 0.01));
-  const estimatedCredit = (baseValue * condition).toFixed(2);
-
-  result.innerHTML = `<strong>Estimated Trade-In Credit: R${estimatedCredit}</strong>`;
-  result.hidden = false;
-}
-
-function runAdvisorMatch() {
-  const budget = Number(document.getElementById('advisorBudget').value);
-  const program = document.getElementById('advisorProgram').value;
-  const result = document.getElementById('advisorResult');
-
-  if (!Number.isFinite(budget) || budget <= 0) {
-    alert('Please enter a valid budget amount.');
-    return;
-  }
-
-  let rec;
-  if (program === 'cs') {
-    rec = budget >= 6000 ? 'Core i5 / Ryzen 5 processor, 16 GB RAM, and SSD for IDEs & programming.' : 'Core i5-class processor with 8 GB RAM (upgradable).';
-  } else if (program === 'it') {
-    rec = budget >= 4500 ? 'Core i5 processor with 8 GB RAM and SSD.' : 'Refurbished laptop with at least 8 GB RAM.';
-  } else {
-    rec = 'Reliable entry-level notebook or tablet for reading and coursework.';
-  }
-
-  result.textContent = rec;
-  result.hidden = false;
-}
-// === UPLOAD PRODUCT WITH IMAGE ===
-async function uploadProduct() {
-  if (!currentUser) return alert('Please sign in to list items.');
-
-  const title = document.getElementById('prodTitle').value;
-  const price = document.getElementById('prodPrice').value;
-  const category = document.getElementById('prodCategory').value;
-  const description = document.getElementById('prodDesc').value;
-  const fileInput = document.getElementById('prodImage');
-  const file = fileInput.files[0];
-
-  if (!file || !title || !price) return alert('Please fill in all required fields.');
-
-  // 1. Upload Image to Supabase Storage
-  const fileExt = file.name.split('.').pop();
-  const fileName = `${Date.now()}.${fileExt}`;
-  
-  const { data: storageData, error: storageError } = await supabaseClient
-    .storage
-    .from('product-images')
-    .upload(fileName, file);
-
-  if (storageError) return alert('Image upload failed: ' + storageError.message);
-
-  // 2. Get Public Image URL
-  const { data: publicUrlData } = supabaseClient
-    .storage
-    .from('product-images')
-    .getPublicUrl(fileName);
-
-  // 3. Insert Product into Database
-  const { error: dbError } = await supabaseClient
-    .from('products')
-    .insert([{
-      title,
-      price: parseFloat(price),
-      category,
-      description,
-      image_url: publicUrlData.publicUrl,
-      seller_email: currentUser.email
-    }]);
-
-  if (dbError) {
-    alert('Failed to publish item: ' + dbError.message);
-  } else {
-    alert('Item listed successfully!');
-    document.getElementById('addListingModal').style.display = 'none';
-  }
-}
-
-// === FETCH AND DISPLAY PRODUCTS ===
+// --- SUPABASE MARKETPLACE & PRODUCTS ---
 async function loadProducts() {
+  if (!supabaseClient) return;
   const { data: products, error } = await supabaseClient
     .from('products')
     .select('*')
     .order('created_at', { ascending: false });
 
   if (error) return console.error('Error fetching products:', error);
-  renderProductCards(products);
+  renderProductCards(products || []);
 }
 
 function renderProductCards(products) {
-  const container = document.getElementById('marketplaceGrid');
+  const container = document.getElementById('marketplaceGrid') || document.getElementById('marketplace-container');
   if (!container) return;
   
+  if (products.length === 0) {
+    container.innerHTML = '<p style="grid-column: 1/-1; text-align:center; padding:2rem; color:#6c757d;">No live listings found yet.</p>';
+    return;
+  }
+
   container.innerHTML = products.map(item => `
     <div class="product-card">
-      <img src="${item.image_url}" alt="${item.title}" />
-      <h4>${item.title}</h4>
-      <p class="price">R ${item.price}</p>
-      <span class="badge">${item.category}</span>
-      <p class="seller">Seller: ${item.seller_email}</p>
-      <button onclick = "openChat('${item.seller_email}', '${item.id}')"class="btn-chat">
-       Message Seller</button>
+      ${item.image_url ? `<img src="${escapeHtml(item.image_url)}" alt="${escapeHtml(item.title || item.name)}" style="width:100%; height:150px; object-fit:cover;" />` : ''}
+      <h4>${escapeHtml(item.title || item.name)}</h4>
+      <p class="price">R ${Number(item.price || 0).toLocaleString()}</p>
+      <span class="badge">${escapeHtml(item.category)}</span>
+      <p class="seller">Seller: ${escapeHtml(item.seller_email || item.seller_id)}</p>
+      <button onclick="openChat('${escapeHtml(item.seller_email || item.seller_id)}', '${escapeHtml(item.id)}')" class="btn-chat btn-primary" style="margin-top:10px; width:100%;">
+        💬 Message Seller
+      </button>
     </div>
   `).join('');
 }
 
-// === REALTIME LISTENER FOR NEW ITEMS ===
-function subscribeToMarketplace() {
-  supabaseClient
-    .channel('public:products')
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'products' }, payload => {
-      console.log('New product added:', payload.new);
-      loadProducts(); // Refresh products automatically for all active users
-    })
-    .subscribe();
-}
-
-// Initialize on page load
-window.addEventListener('DOMContentLoaded', () => {
-  loadProducts();
-  subscribeToMarketplace();
-});
-
-function createNewListing() {
-  if (!currentUser) {
-    openAuthModal();
-    return;
-  }
-  let activeChatPartner = null;
-let activeProductId = null;
-
-// Open Chat Drawer with a specific Seller
+// --- REALTIME CHAT SYSTEM ---
 function openChat(sellerEmail, productId) {
   if (!currentUser) return alert('Please sign in to message sellers.');
   if (currentUser.email === sellerEmail) return alert('This is your own listing!');
 
   activeChatPartner = sellerEmail;
   activeProductId = productId;
-  document.getElementById('chatRecipientTitle').innerText = `Chat with ${sellerEmail}`;
-  document.getElementById('chatModal').style.display = 'block';
+  
+  const titleEl = document.getElementById('chatRecipientTitle');
+  if (titleEl) titleEl.innerText = `Chat with ${sellerEmail}`;
+  
+  const modalEl = document.getElementById('chatModal');
+  if (modalEl) modalEl.style.display = 'flex';
 
   loadChatMessages();
   subscribeToDirectMessages();
 }
 
 function closeChat() {
-  document.getElementById('chatModal').style.display = 'none';
+  const modalEl = document.getElementById('chatModal');
+  if (modalEl) modalEl.style.display = 'none';
 }
 
-// Fetch Conversation Messages
 async function loadChatMessages() {
+  if (!currentUser || !activeChatPartner) return;
+  
   const { data: messages, error } = await supabaseClient
     .from('messages')
     .select('*')
@@ -422,12 +203,13 @@ async function loadChatMessages() {
   if (error) return console.error('Error loading chat:', error);
 
   const chatBox = document.getElementById('chatBox');
-  chatBox.innerHTML = messages.map(msg => {
+  if (!chatBox) return;
+
+  chatBox.innerHTML = (messages || []).map(msg => {
     const isMe = msg.sender_email === currentUser.email;
     return `
-      <div class="message ${isMe ? 'sent' : 'received'}">
-        <p>${msg.message_text}</p>
-        <span class="time">${new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+      <div class="message ${isMe ? 'sent' : 'received'}" style="margin: 5px 0; text-align: ${isMe ? 'right' : 'left'};">
+        <p style="background: ${isMe ? '#dcf8c6' : '#f1f0f0'}; padding: 8px 12px; border-radius: 8px; display: inline-block;">${escapeHtml(msg.message_text)}</p>
       </div>
     `;
   }).join('');
@@ -435,11 +217,11 @@ async function loadChatMessages() {
   chatBox.scrollTop = chatBox.scrollHeight;
 }
 
-// Send Message
 async function sendMessage() {
   const input = document.getElementById('chatInput');
+  if (!input) return;
   const text = input.value.trim();
-  if (!text) return;
+  if (!text || !currentUser || !activeChatPartner) return;
 
   const { error } = await supabaseClient
     .from('messages')
@@ -458,8 +240,8 @@ async function sendMessage() {
   }
 }
 
-// Realtime Chat Subscription
 function subscribeToDirectMessages() {
+  if (!supabaseClient) return;
   supabaseClient
     .channel('public:messages')
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
@@ -473,56 +255,20 @@ function subscribeToDirectMessages() {
     .subscribe();
 }
 
-  const name = document.getElementById('sellTitle').value.trim();
-  const category = document.getElementById('sellCategory').value;
-  const brand = document.getElementById('sellBrand').value.trim();
-  const price = Number(document.getElementById('sellPrice').value);
-
-  if (!name || !brand || !Number.isFinite(price) || price <= 0) {
-    alert('Please complete all fields with a valid asking price.');
-    return;
-  }
-
-  localListings.unshift({
-    id: Date.now(),
-    name,
-    category,
-    brand,
-    price,
-    retail_price: Math.round(price * 1.3),
-    seller_id: (currentUser.email || 'Student').split('@')[0],
-    rating: 5.0
-  });
-
-  document.getElementById('sellTitle').value = '';
-  document.getElementById('sellBrand').value = '';
-  document.getElementById('sellPrice').value = '';
-
-  filterListings();
-  switchTab('marketplace');
-  alert('Device listing published successfully!');
-}
-// === HANDLE MAGIC LINK REDEEM & SESSION ON LOAD ===
+// --- INITIALIZATION ON LOAD ---
 async function checkAuthSession() {
   if (!supabaseClient) return;
   
-  // Check if user returned from clicking the email magic link
-  const { data: { session }, error } = await supabaseClient.auth.getSession();
-  
+  const { data: { session } } = await supabaseClient.auth.getSession();
   if (session && session.user) {
     currentUser = session.user;
     updateAuthUI(currentUser);
-    console.log("Logged in user:", currentUser.email);
   }
 
-  // Listen for real-time authentication state changes
   supabaseClient.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_IN' && session) {
       currentUser = session.user;
       updateAuthUI(currentUser);
-      alert('Successfully signed in as ' + currentUser.email);
-      
-      // Close modal and take them to the marketplace
       const modal = document.getElementById('authModal');
       if (modal) modal.style.display = 'none';
       if (typeof switchTab === 'function') switchTab('marketplace');
@@ -533,53 +279,7 @@ async function checkAuthSession() {
   });
 }
 
-// Run the check when the page loads
 window.addEventListener('DOMContentLoaded', () => {
   checkAuthSession();
-});
-
-function handleBotQuery(event) {
-  if (event) event.preventDefault();
-  const input = document.getElementById('botInput');
-  const logs = document.getElementById('botChatLogs');
-  const msg = input.value.trim();
-  if (!msg) return;
-
-  logs.innerHTML += `<div class="bot-msg user">${escapeHtml(msg)}</div>`;
-  input.value = '';
-
-  const q = msg.toLowerCase();
-  let answer = 'Ask me about finding a device, selling on campus, or specs for your course.';
-  if (q.includes('sell')) answer = 'Sign in, go to the Sell tab, and complete the device details to publish.';
-  else if (q.includes('buy') || q.includes('laptop') || q.includes('phone')) answer = 'Open Marketplace to view available devices listed by students.';
-  else if (q.includes('hi') || q.includes('hello')) answer = 'Hello! How can I help you on campus today?';
-
-  logs.innerHTML += `<div class="bot-msg bot">${answer}</div>`;
-  logs.scrollTop = logs.scrollHeight;
-}
-
-function toggleBot() {
-  const content = document.getElementById('botContent');
-  if (content) content.hidden = !content.hidden;
-}
-
-document.addEventListener('click', event => {
-  const button = event.target.closest('#marketplace-container button[data-seller]');
-  if (button) contactSeller(button.dataset.seller, button.dataset.device);
-});
-
-window.addEventListener('DOMContentLoaded', async () => {
-  renderListings(localListings);
-
-  if (supabaseClient && supabaseClient.auth) {
-    try {
-      const { data } = await supabaseClient.auth.getSession();
-      if (data?.session) {
-        currentUser = data.session.user;
-        updateAuthUI(currentUser);
-      }
-    } catch (error) {
-      console.warn('Supabase session check failed:', error);
-    }
-  }
+  loadProducts();
 });
