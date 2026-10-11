@@ -203,7 +203,7 @@ function updateAuthUI(user) {
   if (user) {
     const studentNum = (user.email || 'Student').split('@')[0];
     container.innerHTML = `
-      <span class="user-badge"> ${studentNum}</span>
+      <span class="user-badge">👤 ${studentNum}</span>
       <button class="btn-primary" onclick="logoutUser()">Log Out</button>
     `;
   } else {
@@ -290,6 +290,98 @@ function runAdvisorMatch() {
   result.textContent = rec;
   result.hidden = false;
 }
+// === UPLOAD PRODUCT WITH IMAGE ===
+async function uploadProduct() {
+  if (!currentUser) return alert('Please sign in to list items.');
+
+  const title = document.getElementById('prodTitle').value;
+  const price = document.getElementById('prodPrice').value;
+  const category = document.getElementById('prodCategory').value;
+  const description = document.getElementById('prodDesc').value;
+  const fileInput = document.getElementById('prodImage');
+  const file = fileInput.files[0];
+
+  if (!file || !title || !price) return alert('Please fill in all required fields.');
+
+  // 1. Upload Image to Supabase Storage
+  const fileExt = file.name.split('.').pop();
+  const fileName = `${Date.now()}.${fileExt}`;
+  
+  const { data: storageData, error: storageError } = await supabaseClient
+    .storage
+    .from('product-images')
+    .upload(fileName, file);
+
+  if (storageError) return alert('Image upload failed: ' + storageError.message);
+
+  // 2. Get Public Image URL
+  const { data: publicUrlData } = supabaseClient
+    .storage
+    .from('product-images')
+    .getPublicUrl(fileName);
+
+  // 3. Insert Product into Database
+  const { error: dbError } = await supabaseClient
+    .from('products')
+    .insert([{
+      title,
+      price: parseFloat(price),
+      category,
+      description,
+      image_url: publicUrlData.publicUrl,
+      seller_email: currentUser.email
+    }]);
+
+  if (dbError) {
+    alert('Failed to publish item: ' + dbError.message);
+  } else {
+    alert('Item listed successfully!');
+    document.getElementById('addListingModal').style.display = 'none';
+  }
+}
+
+// === FETCH AND DISPLAY PRODUCTS ===
+async function loadProducts() {
+  const { data: products, error } = await supabaseClient
+    .from('products')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) return console.error('Error fetching products:', error);
+  renderProductCards(products);
+}
+
+function renderProductCards(products) {
+  const container = document.getElementById('marketplaceGrid');
+  if (!container) return;
+  
+  container.innerHTML = products.map(item => `
+    <div class="product-card">
+      <img src="${item.image_url}" alt="${item.title}" />
+      <h4>${item.title}</h4>
+      <p class="price">R ${item.price}</p>
+      <span class="badge">${item.category}</span>
+      <p class="seller">Seller: ${item.seller_email}</p>
+    </div>
+  `).join('');
+}
+
+// === REALTIME LISTENER FOR NEW ITEMS ===
+function subscribeToMarketplace() {
+  supabaseClient
+    .channel('public:products')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'products' }, payload => {
+      console.log('New product added:', payload.new);
+      loadProducts(); // Refresh products automatically for all active users
+    })
+    .subscribe();
+}
+
+// Initialize on page load
+window.addEventListener('DOMContentLoaded', () => {
+  loadProducts();
+  subscribeToMarketplace();
+});
 
 function createNewListing() {
   if (!currentUser) {

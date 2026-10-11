@@ -219,6 +219,25 @@
     </div>
   </div>
 
+  <!-- posting items/ uploading images to supabase storage -->
+  <div id="addListingModal" class="modal" style="display:none;">
+   <div class="modal-content">
+     <h3>List an Item for Sale</h3>
+     <input type="text" id="prodTitle" placeholder="Item Title (e.g., Lenovo IdeaPad)" required />
+     <input type="number" id="prodPrice" placeholder="Price (ZAR)" required />
+     <select id="prodCategory">
+       <option value="Laptops">Laptops & Computers</option>
+       <option value="Smartphones">Smartphones & Tablets</option>
+       <option value="Textbooks">Textbooks & Notes</option>
+       <option value="Accessories">Accessories & Audio</option>
+     </select>
+     <textarea id="prodDesc" placeholder="Description..."></textarea>
+     <div class = form-group>
+      <label for= "prodImage">Upload Item Picture:</label>
+      <input type="file" id="prodImage" accept="image/*" required />
+     <button onclick="uploadProduct()">Publish Listing</button>
+    </div>
+  </div>
   <!-- AI CHATBOT WIDGET -->
   <div class="ai-agent-panel">
     <div class="ai-agent-header">
