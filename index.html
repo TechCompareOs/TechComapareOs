@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TechCompare OS | Live Campus Platform</title>
-  
+
   <!-- CSS Stylesheet -->
   <link rel="stylesheet" href="Style.css" />
 
@@ -12,26 +12,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 </head>
 <body>
-
-  <!-- Chat Modal Drawer -->
-  <div id="chatModal" class="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); justify-content:center; align-items:center;">
-    <div class="modal-content" style="background:white; padding:20px; border-radius:8px; width:400px; max-width:90%;">
-    <div> class= "chat-header" style= display:flex; justify-content:space-between; align-items:center;border-bottom:1px solid #ddd; padding-bottom:10px;">
-      <h3 id="chatRecipientTitle" style="margin:0;">Chat with Seller</h3>
-      <button onclick ="closeChat()"style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
-    </div>
-
-    <!-- Chat Box -->
-    <div id="chatBox" style="height:250px; overflow-y:auto; margin:10px 0; border:1px solid #eee; padding:10px;"></div>
-
-    <!-- Input Row -->
-    <div class="chat-input-row" style="display:flex; gap:10px;">
-      <input type="text" id="chatInput" placeholder="Ask about the item..." style="flex:1; padding:8px;" />
-      <button onclick="sendMessage()" class="btn-primary" style="padding:8px 16px;">Send</button>
-    </div>
-  </div>
-</div>
-
 
   <!-- Header Navigation -->
   <header>
@@ -45,7 +25,7 @@
       <button id="nav-tradein" onclick="switchTab('tradein')">Trade-In Estimator</button>
       <button id="nav-advisor" onclick="switchTab('advisor')">AI Advisor</button>
       <button id="nav-sell" onclick="switchTab('sell')">Sell Device</button>
-      
+
       <!-- Authentication Container -->
       <div id="authStatus" style="margin-left: 0.5rem;">
         <button class="btn-primary" onclick="openAuthModal()">Sign In</button>
@@ -55,8 +35,17 @@
 
   <!-- Live Activity Bar -->
   <div class="activity-bar">
-    <div><span class="pulse-indicator"></span> <strong>Campus Platform:</strong> <span id="activeListingsCount">4 verified devices listed</span></div>
+    <div><span class="pulse-indicator"></span> <strong>Campus Platform:</strong> <span id="activeListingsCount">Loading listings...</span></div>
     <div style="font-size:0.8rem; opacity:0.8;">Strictly for verified TUT students</div>
+  </div>
+
+  <!-- Public information pages (no login needed) -->
+  <div class="info-nav">
+    <button id="nav-about" onclick="switchTab('about')">About</button>
+    <button id="nav-persona" onclick="switchTab('persona')">Customer Persona</button>
+    <button id="nav-revenue" onclick="switchTab('revenue')">Revenue Model</button>
+    <button id="nav-contact" onclick="switchTab('contact')">Contact</button>
+    <button id="nav-sources" onclick="switchTab('sources')">Sources</button>
   </div>
 
   <main>
@@ -74,7 +63,7 @@
           <p>The verified TUT campus marketplace for buying, selling, and trading laptops, tablets, and mobile devices safely.</p>
           <div class="hero-buttons">
             <button class="btn-hero" onclick="switchTab('marketplace')">Explore Marketplace</button>
-            <button class="btn-hero-outline" onclick="openAuthModal()">Create Account</button>
+            <button class="btn-hero-outline" onclick="openAuthModal(true)">Create Account</button>
           </div>
         </div>
 
@@ -97,7 +86,7 @@
       <!-- MARKETPLACE TAB -->
       <div id="marketplace" class="tab-section">
         <h2 style="color: var(--tut-blue); margin-bottom: 1rem;">Campus Marketplace</h2>
-        
+
         <!-- Single Filter Bar -->
         <div class="filter-bar">
           <input type="text" id="searchInput" placeholder="Search devices (e.g., iPhone, Lenovo)..." onkeyup="filterListings()" />
@@ -108,7 +97,7 @@
             <option value="Tablet">Tablets</option>
           </select>
           <select id="sortFilter" onchange="filterListings()">
-            <option value="featured">Sort By: Featured</option>
+            <option value="featured">Sort By: Newest</option>
             <option value="low">Price: Low to High</option>
             <option value="high">Price: High to Low</option>
           </select>
@@ -174,19 +163,19 @@
         </div>
       </div>
 
-      <!-- SELL TAB -->
+      <!-- SELL TAB (listing form with picture upload) -->
       <div id="sell" class="tab-section">
         <div class="form-box">
           <h2 style="color:var(--tut-blue); margin-bottom:0.5rem;">List Your Device for Sale</h2>
           <p style="font-size:0.85rem; color:#6c757d; margin-bottom:1.2rem;">Post your device to verified TUT students on campus.</p>
 
           <div class="form-group">
-            <label>Device Model Name</label>
+            <label for="sellTitle">Device Name</label>
             <input type="text" id="sellTitle" placeholder="e.g. Lenovo IdeaPad Slim 3">
           </div>
 
           <div class="form-group">
-            <label>Category</label>
+            <label for="sellCategory">Category</label>
             <select id="sellCategory">
               <option value="Laptop">Laptop</option>
               <option value="Phone">Phone</option>
@@ -195,16 +184,197 @@
           </div>
 
           <div class="form-group">
-            <label>Brand</label>
-            <input type="text" id="sellBrand" placeholder="e.g. Lenovo, Apple, HP">
-          </div>
-
-          <div class="form-group">
-            <label>Asking Price (R)</label>
+            <label for="sellPrice">Asking Price (R)</label>
             <input type="number" id="sellPrice" placeholder="e.g. 4200">
           </div>
 
-          <button class="btn-action" onclick="createNewListing()">Publish to Campus Marketplace</button>
+          <div class="form-group">
+            <label for="sellDesc">Description</label>
+            <textarea id="sellDesc" rows="3" placeholder="Condition, specs, what's included..."></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="sellImage">Picture of the Device</label>
+            <input type="file" id="sellImage" accept="image/*">
+          </div>
+
+          <p class="fee-note">Premium listing fee: <strong>R10 per device</strong>. This helps pay for protecting seller details and the website's security. Payments are not switched on in this prototype, so nothing is charged yet.</p>
+
+          <button class="btn-action" id="sellSubmitBtn" onclick="uploadProduct()">Publish to Campus Marketplace</button>
+        </div>
+      </div>
+
+      <!-- ABOUT TAB (public) -->
+      <div id="about" class="tab-section">
+        <div class="form-box info-box">
+          <h2 class="info-title">About TechCompare OS</h2>
+          <p>TechCompare OS is a verified campus marketplace for Tshwane University of Technology (TUT) students. Many first-year students need a laptop or phone for their studies but cannot afford a new one, and buying second-hand on open social media groups exposes them to scams, fake listings and strangers who learn too much about them. TechCompare OS solves this by letting only students with a verified TUT email buy and sell devices, by showing a fair trade-in value for an old device, and by recommending specifications that match a student's course and budget.</p>
+        </div>
+      </div>
+
+      <!-- CUSTOMER PERSONA TAB (public) -->
+      <div id="persona" class="tab-section">
+        <div class="form-box info-box">
+          <h2 class="info-title">Customer Persona</h2>
+          <p class="info-sub">A fictional persona that represents a typical TUT first-year student.</p>
+
+          <div class="persona-card">
+            <div class="persona-avatar" aria-hidden="true">L</div>
+            <div>
+              <h3>Lerato, 19</h3>
+              <p>First-year Diploma in ICT student</p>
+            </div>
+          </div>
+
+          <div class="persona-grid">
+            <div class="persona-block">
+              <h4>Needs</h4>
+              <ul>
+                <li>A reliable laptop with at least 8 GB RAM for programming</li>
+                <li>A budget of about R5,500</li>
+                <li>A phone that lasts the academic year</li>
+              </ul>
+            </div>
+            <div class="persona-block">
+              <h4>Frustrations</h4>
+              <ul>
+                <li>Worried about scams in open social media groups</li>
+                <li>Cannot tell if a second-hand price is fair</li>
+                <li>Does not want to share personal details with strangers</li>
+              </ul>
+            </div>
+            <div class="persona-block">
+              <h4>Goals</h4>
+              <ul>
+                <li>Buy from another verified student</li>
+                <li>Know the right specs for her course</li>
+                <li>Sell her old phone to help pay for the laptop</li>
+              </ul>
+            </div>
+            <div class="persona-block">
+              <h4>How she uses TechCompare OS</h4>
+              <ul>
+                <li>Checks the AI Advisor for specs within her budget</li>
+                <li>Browses the Marketplace and messages a seller</li>
+                <li>Uses the Trade-In Estimator, then lists her old phone</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- REVENUE MODEL TAB (public) -->
+      <div id="revenue" class="tab-section">
+        <div class="form-box info-box">
+          <h2 class="info-title">Revenue Model</h2>
+          <p class="info-sub">TechCompare OS earns from premium listings and a small monthly subscription.</p>
+
+          <table class="info-table">
+            <thead>
+              <tr><th>Revenue stream</th><th>Who pays</th><th>Price</th><th>What it pays for</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Premium listing</td>
+                <td>Student selling a device</td>
+                <td>R10 per device</td>
+                <td>Publishing the listing and protecting the seller's details</td>
+              </tr>
+              <tr>
+                <td>Support subscription</td>
+                <td>Student member</td>
+                <td>R5 per month</td>
+                <td>Keeping the website secure and running</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3 class="info-heading">Variables and parameters</h3>
+          <table class="info-table">
+            <thead>
+              <tr><th>Parameters (fixed for now)</th><th>Variables (change over time)</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Listing fee: R10</td>
+                <td>Number of devices listed per month</td>
+              </tr>
+              <tr>
+                <td>Subscription fee: R5 per month</td>
+                <td>Number of subscribed students</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3 class="info-heading">Revenue calculator</h3>
+          <p class="info-sub">The starting numbers are example assumptions. Change them to test other scenarios.</p>
+
+          <div class="calc-grid">
+            <div class="form-group">
+              <label for="revListings">Devices listed per month</label>
+              <input type="number" id="revListings" value="50" min="0" step="1" oninput="runRevenueCalc()">
+            </div>
+            <div class="form-group">
+              <label for="revSubs">Subscribed students</label>
+              <input type="number" id="revSubs" value="20" min="0" step="1" oninput="runRevenueCalc()">
+            </div>
+          </div>
+
+          <div id="revenueResult" class="result-alert" aria-live="polite"></div>
+
+          <p class="fee-note">Prototype note: payments are not integrated yet. A South African payment gateway is the planned next step.</p>
+        </div>
+      </div>
+
+      <!-- CONTACT TAB (public) -->
+      <div id="contact" class="tab-section">
+        <div class="form-box info-box">
+          <h2 class="info-title">Contact Us</h2>
+          <p class="info-sub">Questions, feedback or a problem with a listing? Send us a message and the TechCompare OS team will read it.</p>
+
+          <div class="form-group">
+            <label for="contactName">Your name</label>
+            <input type="text" id="contactName" maxlength="100" placeholder="e.g. Lerato">
+          </div>
+          <div class="form-group">
+            <label for="contactEmail">Your email</label>
+            <input type="email" id="contactEmail" maxlength="200" placeholder="e.g. 218000000@tut4life.ac.za">
+          </div>
+          <div class="form-group">
+            <label for="contactMessage">Message</label>
+            <textarea id="contactMessage" rows="5" maxlength="1000" placeholder="How can we help?"></textarea>
+          </div>
+
+          <button class="btn-action" id="contactSubmitBtn" onclick="submitContact()">Send Message</button>
+          <div id="contactResult" class="result-alert" hidden aria-live="polite"></div>
+        </div>
+      </div>
+
+      <!-- SOURCES TAB (public) -->
+      <div id="sources" class="tab-section">
+        <div class="form-box info-box">
+          <h2 class="info-title">Sources and Tools</h2>
+          <p class="info-sub">Everything on this site was written and built by the project group. The logo is the group's own design. The tools and references used are listed here.</p>
+
+          <h3 class="info-heading">Hosting, database and tools</h3>
+          <table class="info-table">
+            <thead>
+              <tr><th>Purpose</th><th>Tool</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Website hosting (HTTPS)</td><td>GitHub Pages</td></tr>
+              <tr><td>Database, magic-link login, picture storage and live chat</td><td>Supabase</td></tr>
+              <tr><td>Website code</td><td>HTML, CSS and JavaScript (supabase-js loaded from the jsDelivr CDN)</td></tr>
+            </tbody>
+          </table>
+          <p>Students sign in with a magic link sent to their TUT email, so no passwords are stored by the site.</p>
+
+          <h3 class="info-heading">Reference list</h3>
+          <ul class="ref-list">
+            <li>GitHub. n.d. <em>GitHub Pages Documentation</em>. <a href="https://docs.github.com/en/pages" target="_blank" rel="noopener noreferrer">https://docs.github.com/en/pages</a>.</li>
+            <li>Supabase. n.d. <em>Supabase Documentation</em>. <a href="https://supabase.com/docs" target="_blank" rel="noopener noreferrer">https://supabase.com/docs</a>.</li>
+            <li>Tshwane University of Technology, Faculty of ICT. 2026. <em>JGA 2026 Student Step-by-Step Guide</em>. Pretoria: Tshwane University of Technology.</li>
+          </ul>
         </div>
       </div>
 
@@ -214,19 +384,14 @@
   <!-- UNIFIED AUTHENTICATION MODAL -->
   <div class="modal-overlay" id="authModal">
     <div class="modal-card">
-      <button class="modal-close" onclick="closeAuthModal()">&times;</button>
+      <button class="modal-close" onclick="closeAuthModal()" aria-label="Close">&times;</button>
       <h2 id="modalTitle" style="color:var(--tut-blue); margin-bottom:0.3rem;">Student Sign In</h2>
-      <p class="modal-sub">Use your verified TUT student email (@tut4life.ac.za)</p>
+      <p class="modal-sub">Use your verified TUT student email (@tut4life.ac.za). We'll email you a magic link, no password needed.</p>
 
       <form id="authForm" onsubmit="handleAuth(event)">
         <div class="form-group">
-          <label>TUT Email Address</label>
+          <label for="authEmail">TUT Email Address</label>
           <input type="email" id="authEmail" placeholder="e.g. 218000000@tut4life.ac.za" required>
-        </div>
-
-        <div class="form-group">
-          <label>Password</label>
-          <input type="password" id="authPassword" placeholder="••••••••" required>
         </div>
 
         <button type="submit" class="btn-action" style="margin-top:1rem;" id="authSubmitBtn">Send Magic Link</button>
@@ -239,25 +404,23 @@
     </div>
   </div>
 
-  <!-- posting items/ uploading images to supabase storage -->
-  <div id="addListingModal" class="modal" style="display:none;">
-   <div class="modal-content">
-     <h3>List an Item for Sale</h3>
-     <input type="text" id="prodTitle" placeholder="Item Title (e.g., Lenovo IdeaPad)" required />
-     <input type="number" id="prodPrice" placeholder="Price (ZAR)" required />
-     <select id="prodCategory">
-       <option value="Laptops">Laptops & Computers</option>
-       <option value="Smartphones">Smartphones & Tablets</option>
-       <option value="Textbooks">Textbooks & Notes</option>
-       <option value="Accessories">Accessories & Audio</option>
-     </select>
-     <textarea id="prodDesc" placeholder="Description..."></textarea>
-     <div class = form-group>
-      <label for= "prodImage">Upload Item Picture:</label>
-      <input type="file" id="prodImage" accept="image/*" required />
-     <button onclick="uploadProduct()">Publish Listing</button>
+  <!-- CHAT MODAL -->
+  <div class="modal-overlay" id="chatModal">
+    <div class="modal-card chat-card">
+      <div class="chat-header">
+        <h3 id="chatRecipientTitle">Chat with Seller</h3>
+        <button class="chat-close" onclick="closeChat()" aria-label="Close chat">&times;</button>
+      </div>
+
+      <div id="chatBox" class="chat-box"></div>
+
+      <div class="chat-input-row">
+        <input type="text" id="chatInput" placeholder="Ask about the item..." />
+        <button class="btn-primary" onclick="sendMessage()">Send</button>
+      </div>
     </div>
   </div>
+
   <!-- AI CHATBOT WIDGET -->
   <div class="ai-agent-panel">
     <div class="ai-agent-header">
