@@ -43,6 +43,7 @@
   <div class="info-nav">
     <button id="nav-about" onclick="switchTab('about')">About</button>
     <button id="nav-persona" onclick="switchTab('persona')">Customer Persona</button>
+    <button id="nav-research" onclick="switchTab('research')">Research</button>
     <button id="nav-revenue" onclick="switchTab('revenue')">Revenue Model</button>
     <button id="nav-contact" onclick="switchTab('contact')">Contact</button>
     <button id="nav-sources" onclick="switchTab('sources')">Sources</button>
@@ -263,6 +264,57 @@
         </div>
       </div>
 
+      <!-- RESEARCH TAB (public): five case studies -->
+      <div id="research" class="tab-section">
+        <div class="form-box info-box">
+          <h2 class="info-title">Research: Evidence of the Problem</h2>
+          <p class="info-sub">Five published cases show the fraud patterns that students face when buying and selling devices online. Each summary is in the group's own words, with the source named under it.</p>
+
+          <div class="case-card">
+            <span class="case-num">1</span>
+            <h3>Fraud wave in eMalahleni</h3>
+            <p class="case-source">Mudzanani (2026), <em>The Witness</em>, 5 June 2026</p>
+            <p><strong>What happened:</strong> Five separate fraud cases over four days in May 2026 cost victims about R700,000 in total. They included a buyer who paid for machinery advertised online while the seller disappeared, a fraudster posing as a bank official, and a supplier whose company had already been deregistered.</p>
+            <p><strong>What it means for TechCompare OS:</strong> The online purchase failed because nobody could check the seller. Only students with a verified TUT email can list on our marketplace.</p>
+          </div>
+
+          <div class="case-card">
+            <span class="case-num">2</span>
+            <h3>BogusBazaar fake webshops</h3>
+            <p class="case-source">Marx (2024), <em>SRLabs Research</em>, 5 August 2024</p>
+            <p><strong>What happened:</strong> Security researchers found a network of more than 75,000 fake online shops, with about 22,500 active in April 2024. Since 2021 it has handled over one million orders worth an estimated USD 50 million, affecting more than 850,000 victims. Fake payment pages collected card details, and the goods usually never arrived.</p>
+            <p><strong>What it means for TechCompare OS:</strong> A shop can look professional and still be fake. Our seller profiles show ratings and comments built up over real sales, which is harder to fake than a single review.</p>
+          </div>
+
+          <div class="case-card">
+            <span class="case-num">3</span>
+            <h3>Macro Venture broker complaints</h3>
+            <p class="case-source">Egorov (2026), <em>DNB Forex Review</em>, 23 April 2026</p>
+            <p><strong>What happened:</strong> The article describes a pattern seen with scam brokers: pressure to deposit more money, delays and extra fees when withdrawing, and support that goes silent after payment. It describes general patterns rather than confirmed cases, and the site also sells refund-help services.</p>
+            <p><strong>What it means for TechCompare OS:</strong> Scammers use pressure and then disappear. Conversations on our platform stay in the in-app chat history, and there is no "limited-time deal" pressure built into the site.</p>
+          </div>
+
+          <div class="case-card">
+            <span class="case-num">4</span>
+            <h3>Fake "Students Laptop Scheme 2026"</h3>
+            <p class="case-source">Khourie (2026), <em>Africa Check</em>, 17 April 2026</p>
+            <p><strong>What happened:</strong> WhatsApp messages promised free laptops to more than 960,000 students and sent people to a registration link. Africa Check's antivirus flagged the link as phishing, and the article rated the message a scam. It is a recurring hoax that keeps coming back in new forms.</p>
+            <p><strong>What it means for TechCompare OS:</strong> Students who cannot afford a laptop are an easy target. TechCompare OS only asks for your TUT email, never your ID number or bank details.</p>
+          </div>
+
+          <div class="case-card">
+            <span class="case-num">5</span>
+            <h3>Student-targeted scams</h3>
+            <p class="case-source">Scheepers (2024), <em>Parys Gazette</em>, 26 November 2024</p>
+            <p><strong>What happened:</strong> Students looking for cheap tech, and students selling laptops or consoles, are both targeted. Warning signs include very low prices, buyers who offer more than the asking price, requests for extra courier fees, fake payment messages, and pushing the chat onto private messaging apps. The advice includes meeting in safe public places and not letting anyone rush you.</p>
+            <p><strong>What it means for TechCompare OS:</strong> Buyers and sellers chat inside the platform, and the Trade-In Estimator gives a fair price to compare against.</p>
+          </div>
+
+          <h3 class="info-heading">What we learned</h3>
+          <p>Every case involves a seller or shop that cannot be checked, urgency, and a payment that cannot be recovered. TechCompare OS responds with three things: verified student accounts, seller profiles with ratings and comments, and in-platform chat. Full references are on the Sources page.</p>
+        </div>
+      </div>
+
       <!-- REVENUE MODEL TAB (public) -->
       <div id="revenue" class="tab-section">
         <div class="form-box info-box">
@@ -354,7 +406,7 @@
       <div id="sources" class="tab-section">
         <div class="form-box info-box">
           <h2 class="info-title">Sources and Tools</h2>
-          <p class="info-sub">Everything on this site was written and built by the project group. The logo is the group's own design. The tools and references used are listed here.</p>
+          <p class="info-sub">This site was written and built by the project group, and the logo is the group's own design. The case study summaries on the Research page are in the group's own words, based on the sources listed below.</p>
 
           <h3 class="info-heading">Hosting, database and tools</h3>
           <table class="info-table">
@@ -371,7 +423,12 @@
 
           <h3 class="info-heading">Reference list</h3>
           <ul class="ref-list">
+            <li>Egorov, Anatoly. 2026. "Broker Scammer Macro Venture – Review, Deception Scheme." <em>DNB Forex Review</em>, April 23, 2026. <a href="https://dnbreview.com/macro-venture/" target="_blank" rel="noopener noreferrer">https://dnbreview.com/macro-venture/</a>.</li>
             <li>GitHub. n.d. <em>GitHub Pages Documentation</em>. <a href="https://docs.github.com/en/pages" target="_blank" rel="noopener noreferrer">https://docs.github.com/en/pages</a>.</li>
+            <li>Khourie, Taryn. 2026. "Scam Alert: Message Offering Applications for 'Students Laptop Scheme 2026' May Steal Your Personal Information." <em>Africa Check</em>, April 17, 2026. <a href="https://africacheck.org/fact-checks/meta-programme-fact-checks/scam-alert-message-offering-applications-students-laptop" target="_blank" rel="noopener noreferrer">https://africacheck.org/fact-checks/meta-programme-fact-checks/scam-alert-message-offering-applications-students-laptop</a>.</li>
+            <li>Marx, Matthias. 2024. "BogusBazaar: A Criminal Network of Webshop Fraudsters." <em>SRLabs Research</em>, August 5, 2024. <a href="https://srlabs.de/blog/bogusbazaar" target="_blank" rel="noopener noreferrer">https://srlabs.de/blog/bogusbazaar</a>.</li>
+            <li>Mudzanani, Lucia. 2026. "R700k Lost in Days as Wave of Scams Sweeps through eMalahleni." <em>The Witness</em>, June 5, 2026. <a href="https://witness.co.za/news/2026/06/05/r700k-lost-in-days-as-wave-of-scams-sweeps-through-emalahleni/" target="_blank" rel="noopener noreferrer">https://witness.co.za/news/2026/06/05/r700k-lost-in-days-as-wave-of-scams-sweeps-through-emalahleni/</a>.</li>
+            <li>Scheepers, Liezl. 2024. "Student-Targeted Scams: How to Stay Safe." <em>Parys Gazette</em>, November 26, 2024. <a href="https://www.citizen.co.za/parys-gazette/news/news-news/2024/11/26/student-targeted-scams-how-to-stay-safe/" target="_blank" rel="noopener noreferrer">https://www.citizen.co.za/parys-gazette/news/news-news/2024/11/26/student-targeted-scams-how-to-stay-safe/</a>.</li>
             <li>Supabase. n.d. <em>Supabase Documentation</em>. <a href="https://supabase.com/docs" target="_blank" rel="noopener noreferrer">https://supabase.com/docs</a>.</li>
             <li>Tshwane University of Technology, Faculty of ICT. 2026. <em>JGA 2026 Student Step-by-Step Guide</em>. Pretoria: Tshwane University of Technology.</li>
           </ul>

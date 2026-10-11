@@ -30,7 +30,7 @@ function escapeHtml(value) {
 
 // === TABS ===
 // These pages can be opened without signing in.
-const PUBLIC_TABS = ['home', 'about', 'persona', 'revenue', 'contact', 'sources'];
+const PUBLIC_TABS = ['home', 'about', 'persona', 'research', 'revenue', 'contact', 'sources'];
 
 function switchTab(tabId) {
   const section = document.getElementById(tabId);
