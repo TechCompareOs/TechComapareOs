@@ -115,10 +115,14 @@ async function handleAuth(event) {
       throw new Error('Supabase client is not initialized.');
     }
 
+    // Send the student back to wherever the site is hosted, so this keeps working
+    // whatever the GitHub repository is called.
+    const siteUrl = window.location.origin + window.location.pathname.replace(/index\.html$/, '');
+
     const { error } = await supabaseClient.auth.signInWithOtp({
       email: email,
       options: {
-        emailRedirectTo: 'https://techcompareos.github.io/TechCompareOs/'
+        emailRedirectTo: siteUrl
       }
     });
 
