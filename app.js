@@ -362,6 +362,8 @@ function renderProductCards(products) {
       <p class="price">R ${item.price}</p>
       <span class="badge">${item.category}</span>
       <p class="seller">Seller: ${item.seller_email}</p>
+      <button onclick = "openChat('${item.seller_email}', '${item.id}')"class="btn-chat">
+       Message Seller</button>
     </div>
   `).join('');
 }
@@ -388,6 +390,88 @@ function createNewListing() {
     openAuthModal();
     return;
   }
+  let activeChatPartner = null;
+let activeProductId = null;
+
+// Open Chat Drawer with a specific Seller
+function openChat(sellerEmail, productId) {
+  if (!currentUser) return alert('Please sign in to message sellers.');
+  if (currentUser.email === sellerEmail) return alert('This is your own listing!');
+
+  activeChatPartner = sellerEmail;
+  activeProductId = productId;
+  document.getElementById('chatRecipientTitle').innerText = `Chat with ${sellerEmail}`;
+  document.getElementById('chatModal').style.display = 'block';
+
+  loadChatMessages();
+  subscribeToDirectMessages();
+}
+
+function closeChat() {
+  document.getElementById('chatModal').style.display = 'none';
+}
+
+// Fetch Conversation Messages
+async function loadChatMessages() {
+  const { data: messages, error } = await supabaseClient
+    .from('messages')
+    .select('*')
+    .or(`and(sender_email.eq.${currentUser.email},receiver_email.eq.${activeChatPartner}),and(sender_email.eq.${activeChatPartner},receiver_email.eq.${currentUser.email})`)
+    .order('created_at', { ascending: true });
+
+  if (error) return console.error('Error loading chat:', error);
+
+  const chatBox = document.getElementById('chatBox');
+  chatBox.innerHTML = messages.map(msg => {
+    const isMe = msg.sender_email === currentUser.email;
+    return `
+      <div class="message ${isMe ? 'sent' : 'received'}">
+        <p>${msg.message_text}</p>
+        <span class="time">${new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+      </div>
+    `;
+  }).join('');
+  
+  chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+// Send Message
+async function sendMessage() {
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text) return;
+
+  const { error } = await supabaseClient
+    .from('messages')
+    .insert([{
+      sender_email: currentUser.email,
+      receiver_email: activeChatPartner,
+      product_id: activeProductId,
+      message_text: text
+    }]);
+
+  if (error) {
+    alert('Failed to send message: ' + error.message);
+  } else {
+    input.value = '';
+    loadChatMessages();
+  }
+}
+
+// Realtime Chat Subscription
+function subscribeToDirectMessages() {
+  supabaseClient
+    .channel('public:messages')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
+      if (
+        (payload.new.sender_email === activeChatPartner && payload.new.receiver_email === currentUser.email) ||
+        (payload.new.sender_email === currentUser.email && payload.new.receiver_email === activeChatPartner)
+      ) {
+        loadChatMessages();
+      }
+    })
+    .subscribe();
+}
 
   const name = document.getElementById('sellTitle').value.trim();
   const category = document.getElementById('sellCategory').value;

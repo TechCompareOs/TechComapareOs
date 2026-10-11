@@ -13,6 +13,25 @@
 </head>
 <body>
 
+  <!-- Chat Drawer / Modal -->
+<div id="chatModal" class="modal" style="display:none;">
+  <div class="modal-content chat-content">
+    <div class="chat-header">
+      <h3 id="chatRecipientTitle">Chat with Seller</h3>
+      <button onclick="closeChat()" class="close-btn">&times;</button>
+    </div>
+    
+    <!-- Chat Messages Window -->
+    <div id="chatBox" class="chat-box"></div>
+
+    <!-- Message Input Bar -->
+    <div class="chat-input-row">
+      <input type="text" id="chatInput" placeholder="Ask about condition, price, or meetup..." />
+      <button onclick="sendMessage()">Send</button>
+    </div>
+  </div>
+</div>
+
   <!-- Header Navigation -->
   <header>
     <div class="brand-container" onclick="switchTab('home')">
