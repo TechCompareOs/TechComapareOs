@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -25,6 +25,7 @@
       <button id="nav-tradein" onclick="switchTab('tradein')">Trade-In Estimator</button>
       <button id="nav-advisor" onclick="switchTab('advisor')">AI Advisor</button>
       <button id="nav-sell" onclick="switchTab('sell')">Sell Device</button>
+      <button id="nav-mylistings" onclick="switchTab('mylistings')">My Listings</button>
 
       <!-- Authentication Container -->
       <div id="authStatus" style="margin-left: 0.5rem;">
@@ -199,9 +200,20 @@
             <input type="file" id="sellImage" accept="image/*">
           </div>
 
-          <p class="fee-note">Premium listing fee: <strong>R10 per device</strong>. This helps pay for protecting seller details and the website's security. Payments are not switched on in this prototype, so nothing is charged yet.</p>
+          <p class="fee-note">Premium listing fee: <strong>R10 per device</strong>. This helps pay for protecting seller details and the website's security. Payments are not switched on in this prototype, so nothing is charged yet.<br>A listing stays live for <strong>30 days</strong>. After that it is hidden until you renew it from the My Listings tab.</p>
 
           <button class="btn-action" id="sellSubmitBtn" onclick="uploadProduct()">Publish to Campus Marketplace</button>
+        </div>
+      </div>
+
+      <!-- MY LISTINGS TAB (signed-in sellers) -->
+      <div id="mylistings" class="tab-section">
+        <h2 style="color: var(--tut-blue); margin-bottom: 0.3rem;">My Listings</h2>
+        <p class="info-sub" style="margin-bottom: 0.3rem;">Each listing stays live for 30 days. Renew it to keep it showing, mark it as sold once it is gone, or delete it.</p>
+        <p id="mylistingsSummary" class="listing-summary" aria-live="polite"></p>
+
+        <div id="mylistings-container" class="grid">
+          <!-- Your listings rendered by app.js -->
         </div>
       </div>
 

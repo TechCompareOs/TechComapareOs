@@ -1,8 +1,10 @@
-﻿// === SUPABASE INITIALIZATION ===
+// === SUPABASE INITIALIZATION ===
 const SUPABASE_URL = "https://hizmjehkwbgmrlxezvcl.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_NvyZ8UYqTfZ5kQOhI87z0w_tOBpX9Ha";
 const IMAGE_BUCKET = 'product-images';
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB
+const LISTING_DAYS = 30;                 // a listing stays live this long unless the seller renews it
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 let supabaseClient = null;
 if (window.supabase && typeof window.supabase.createClient === 'function') {
@@ -48,6 +50,8 @@ function switchTab(tabId) {
   section.classList.add('active');
   const navBtn = document.getElementById(`nav-${tabId}`);
   if (navBtn) navBtn.classList.add('active');
+
+  if (tabId === 'mylistings') renderMyListings();
 }
 
 // === AUTH MODAL ===
@@ -165,10 +169,48 @@ async function logoutUser() {
   }
   teardownChatSubscription();
   currentUser = null;
+  allProducts = [];
   updateAuthUI(null);
   filterListings();
+  renderMyListings();
   switchTab('home');
   alert('You have logged out.');
+}
+
+// === LISTING LIFE CYCLE: Available -> Sold, or expires after LISTING_DAYS ===
+function isSold(item) {
+  return item.status === 'Sold';
+}
+
+function isExpired(item) {
+  return !!item.expires_at && new Date(item.expires_at).getTime() <= Date.now();
+}
+
+// A listing shows in the marketplace only while it is available and not expired.
+// (Rows from before the status/expires_at columns existed count as available.)
+function isLive(item) {
+  return !isSold(item) && !isExpired(item);
+}
+
+function plural(n, word) {
+  return `${n} ${word}${n === 1 ? '' : 's'}`;
+}
+
+function ageLabel(item) {
+  if (!item.created_at) return '';
+  const days = Math.max(0, Math.floor((Date.now() - new Date(item.created_at).getTime()) / DAY_MS));
+  return days === 0 ? 'Listed today' : `Listed ${plural(days, 'day')} ago`;
+}
+
+function expiryLabel(item) {
+  if (isSold(item)) return 'Sold';
+  if (!item.expires_at) return '';
+  const diff = new Date(item.expires_at).getTime() - Date.now();
+  if (diff <= 0) {
+    const daysAgo = Math.max(0, Math.floor(-diff / DAY_MS));
+    return daysAgo === 0 ? 'Expired today' : `Expired ${plural(daysAgo, 'day')} ago`;
+  }
+  return `Expires in ${plural(Math.ceil(diff / DAY_MS), 'day')}`;
 }
 
 // === MARKETPLACE (Supabase `products` table) ===
@@ -176,6 +218,14 @@ async function loadProducts() {
   const container = document.getElementById('marketplace-container');
   if (!supabaseClient) {
     if (container) container.innerHTML = '<p class="empty-note">Could not connect to the database.</p>';
+    return;
+  }
+
+  // Listings are for signed-in TUT students only
+  if (!currentUser) {
+    allProducts = [];
+    filterListings();
+    renderMyListings();
     return;
   }
 
@@ -192,6 +242,7 @@ async function loadProducts() {
 
   allProducts = data || [];
   filterListings();
+  renderMyListings();
 }
 
 function filterListings() {
@@ -204,6 +255,7 @@ function filterListings() {
   const sort = sortFilter ? sortFilter.value : 'featured';
 
   const filtered = allProducts.filter(item => {
+    if (!isLive(item)) return false;
     const haystack = [item.title, item.name, item.brand, item.description, item.category]
       .map(part => String(part ?? '').toLowerCase())
       .join(' ');
@@ -223,11 +275,16 @@ function renderProductCards(products) {
   const countEl = document.getElementById('activeListingsCount');
 
   if (countEl) {
-    const total = allProducts.length;
-    countEl.textContent = `${total} live listing${total === 1 ? '' : 's'}`;
+    countEl.textContent = currentUser
+      ? plural(allProducts.filter(isLive).length, 'live listing')
+      : 'Sign in to see live listings';
   }
   if (!container) return;
 
+  if (!currentUser) {
+    container.innerHTML = '<p class="empty-note">Sign in with your TUT email to see live listings.</p>';
+    return;
+  }
   if (!products || products.length === 0) {
     container.innerHTML = '<p class="empty-note">No listings found matching your search.</p>';
     return;
@@ -254,10 +311,156 @@ function renderProductCards(products) {
         ${description}
         <p class="price">R ${Number(item.price || 0).toLocaleString()}</p>
         <p class="seller">Seller: ${escapeHtml(sellerLabel)}</p>
+        <p class="age-note">${escapeHtml([ageLabel(item), expiryLabel(item)].filter(Boolean).join(' · '))}</p>
         ${action}
       </div>
     `;
   }).join('');
+}
+
+// === MY LISTINGS: mark sold, edit price, renew, delete ===
+function renderMyListings() {
+  const container = document.getElementById('mylistings-container');
+  const summary = document.getElementById('mylistingsSummary');
+  if (!container) return;
+
+  if (!currentUser) {
+    container.innerHTML = '<p class="empty-note">Sign in to see your listings.</p>';
+    if (summary) summary.textContent = '';
+    return;
+  }
+
+  const mine = allProducts.filter(item => item.seller_email === currentUser.email);
+  const live = mine.filter(isLive).length;
+  const sold = mine.filter(isSold).length;
+  const expired = mine.filter(item => !isSold(item) && isExpired(item)).length;
+  if (summary) summary.textContent = `${live} live · ${sold} sold · ${expired} expired`;
+
+  if (mine.length === 0) {
+    container.innerHTML = '<p class="empty-note">You have not listed any devices yet. Use the Sell Device tab to add one.</p>';
+    return;
+  }
+
+  container.innerHTML = mine.map(item => {
+    const title = item.title || item.name || 'Untitled device';
+    const id = escapeHtml(item.id);
+    const state = isSold(item) ? 'sold' : (isExpired(item) ? 'expired' : 'live');
+    const stateText = { live: 'Live', sold: 'Sold', expired: 'Expired' }[state];
+
+    const buttons = [];
+    if (state === 'live') {
+      buttons.push(`<button class="btn-small btn-ok" data-action="sold" data-id="${id}">Mark as sold</button>`);
+      buttons.push(`<button class="btn-small" data-action="price" data-id="${id}">Edit price</button>`);
+    }
+    const renewText = state === 'live' ? `Renew ${LISTING_DAYS} days`
+      : (state === 'sold' ? 'Relist' : `Renew for ${LISTING_DAYS} days`);
+    buttons.push(`<button class="btn-small" data-action="renew" data-id="${id}">${renewText}</button>`);
+    buttons.push(`<button class="btn-small btn-danger" data-action="delete" data-id="${id}">Delete</button>`);
+
+    return `
+      <div class="listing-card is-${state}">
+        ${item.image_url ? `<img class="card-img" src="${escapeHtml(item.image_url)}" alt="${escapeHtml(title)}" loading="lazy" />` : ''}
+        <div class="card-header">
+          <span class="card-tag">${escapeHtml(item.category || 'Device')}</span>
+          <span class="status-badge status-${state}">${stateText}</span>
+        </div>
+        <h3>${escapeHtml(title)}</h3>
+        <p class="price">R ${Number(item.price || 0).toLocaleString()}</p>
+        <p class="age-note">${escapeHtml([ageLabel(item), expiryLabel(item)].filter(Boolean).join(' · '))}</p>
+        <div class="my-actions">${buttons.join('')}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+// Changes one of the signed-in student's own listings.
+// The database also enforces ownership (see setup.sql); .select() lets us notice a change that was refused.
+async function updateListing(id, changes) {
+  if (!supabaseClient || !currentUser) return false;
+
+  const { data, error } = await supabaseClient
+    .from('products')
+    .update(changes)
+    .eq('id', id)
+    .eq('seller_email', currentUser.email)
+    .select();
+
+  if (error) {
+    console.error('Update failed:', error);
+    const hint = /column|status|expires_at/i.test(error.message || '')
+      ? ' Run the latest setup.sql in Supabase first.' : '';
+    alert('Could not update the listing: ' + error.message + hint);
+    return false;
+  }
+  if (!data || data.length === 0) {
+    alert('That listing could not be changed. It may not be yours, or it was already removed.');
+    return false;
+  }
+  return true;
+}
+
+async function deleteListing(item) {
+  const { data, error } = await supabaseClient
+    .from('products')
+    .delete()
+    .eq('id', item.id)
+    .eq('seller_email', currentUser.email)
+    .select();
+
+  if (error) {
+    alert('Could not delete the listing: ' + error.message);
+    return false;
+  }
+  if (!data || data.length === 0) {
+    alert('That listing could not be deleted. It may not be yours, or it was already removed.');
+    return false;
+  }
+
+  // Remove the picture too, so deleted listings do not leave files behind
+  const path = imagePathFromUrl(item.image_url);
+  if (path) {
+    const { error: removeError } = await supabaseClient.storage.from(IMAGE_BUCKET).remove([path]);
+    if (removeError) console.warn('Picture could not be removed:', removeError);
+  }
+  return true;
+}
+
+function imagePathFromUrl(url) {
+  if (!url) return null;
+  const marker = `/object/public/${IMAGE_BUCKET}/`;
+  const index = url.indexOf(marker);
+  if (index === -1) return null;
+  return decodeURIComponent(url.slice(index + marker.length).split('?')[0]);
+}
+
+async function handleListingAction(action, id) {
+  const item = allProducts.find(product => String(product.id) === String(id));
+  if (!item || !currentUser) return;
+
+  let done = false;
+
+  if (action === 'sold') {
+    done = await updateListing(item.id, { status: 'Sold' });
+  } else if (action === 'renew') {
+    done = await updateListing(item.id, {
+      status: 'Available',
+      expires_at: new Date(Date.now() + LISTING_DAYS * DAY_MS).toISOString()
+    });
+  } else if (action === 'price') {
+    const answer = prompt('New asking price (R):', item.price);
+    if (answer === null) return;
+    const price = Number(String(answer).replace(',', '.'));
+    if (!Number.isFinite(price) || price <= 0 || price > 1000000) {
+      alert('Please enter a valid price greater than 0.');
+      return;
+    }
+    done = await updateListing(item.id, { price });
+  } else if (action === 'delete') {
+    if (!confirm('Delete this listing permanently? This cannot be undone.')) return;
+    done = await deleteListing(item);
+  }
+
+  if (done) await loadProducts();
 }
 
 // === SELL: upload image + insert listing ===
@@ -334,7 +537,7 @@ async function uploadProduct() {
 
     await loadProducts();
     switchTab('marketplace');
-    alert('Device listing published successfully!');
+    alert(`Device listing published! It stays live for ${LISTING_DAYS} days. You can renew, edit or remove it from My Listings.`);
   } catch (err) {
     console.error('Publish failed:', err);
     alert('Could not publish your listing: ' + (err.message || err));
@@ -614,6 +817,9 @@ function toggleBot() {
 document.addEventListener('click', event => {
   const chatBtn = event.target.closest('.btn-chat');
   if (chatBtn) openChat(chatBtn.dataset.seller, chatBtn.dataset.product);
+
+  const listingBtn = event.target.closest('#mylistings-container button[data-action]');
+  if (listingBtn) handleListingAction(listingBtn.dataset.action, listingBtn.dataset.id);
 });
 
 async function checkAuthSession() {
@@ -624,25 +830,29 @@ async function checkAuthSession() {
     if (data?.session?.user) {
       currentUser = data.session.user;
       updateAuthUI(currentUser);
-      filterListings();
     }
   } catch (error) {
     console.warn('Supabase session check failed:', error);
   }
+
+  // Load listings only once we know whether a student is signed in
+  await loadProducts();
 
   supabaseClient.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_IN' && session) {
       currentUser = session.user;
       updateAuthUI(currentUser);
       closeAuthModal();
-      filterListings();
+      loadProducts();
       const home = document.getElementById('home');
       if (home && home.classList.contains('active')) switchTab('marketplace');
     } else if (event === 'SIGNED_OUT') {
       teardownChatSubscription();
       currentUser = null;
+      allProducts = [];
       updateAuthUI(null);
       filterListings();
+      renderMyListings();
     }
   });
 }
@@ -659,6 +869,5 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   runRevenueCalc();
-  checkAuthSession();
-  loadProducts();
+  checkAuthSession(); // also loads the listings, once the session is known
 });

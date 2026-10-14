@@ -914,6 +914,81 @@ input, select, button {
   word-break: break-all;
 }
 
+/* ===== Listing age, My Listings ===== */
+.age-note {
+  font-size: 0.8rem;
+  color: #6c757d;
+  margin-bottom: 10px;
+}
+
+.listing-summary {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--tut-blue);
+  margin-bottom: 1rem;
+}
+
+.status-badge {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.status-live { background: #28a745; }
+.status-sold { background: #6c757d; }
+.status-expired { background: var(--tut-red); }
+
+.listing-card.is-sold,
+.listing-card.is-expired {
+  background: #f1f3f5;
+}
+
+.listing-card.is-sold .card-img,
+.listing-card.is-expired .card-img {
+  filter: grayscale(1);
+  opacity: 0.7;
+}
+
+.my-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.btn-small {
+  background: #ffffff;
+  color: var(--tut-blue);
+  border: 1px solid var(--tut-blue);
+  border-radius: 6px;
+  padding: 0.4rem 0.7rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-small:hover {
+  background: var(--tut-blue);
+  color: #ffffff;
+}
+
+.btn-small.btn-ok {
+  background: #28a745;
+  border-color: #28a745;
+  color: #ffffff;
+}
+
+.btn-small.btn-danger {
+  color: var(--tut-red);
+  border-color: var(--tut-red);
+}
+
+.btn-small.btn-danger:hover {
+  background: var(--tut-red);
+  color: #ffffff;
+}
+
 /* Research case cards */
 .case-card {
   position: relative;
