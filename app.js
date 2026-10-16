@@ -15,6 +15,7 @@ if (window.supabase && typeof window.supabase.createClient === 'function') {
 
 let currentUser = null;
 let isSignUpMode = false;
+let pendingAuthEmail = '';
 let allProducts = [];
 let activeChatPartner = null;
 let activeProductId = null;
@@ -75,6 +76,7 @@ function applyAuthMode() {
 
 function openAuthModal(signUp = false) {
   isSignUpMode = signUp === true;
+  showCodeStep(false);
   applyAuthMode();
   const modal = document.getElementById('authModal');
   if (modal) modal.style.display = 'flex';
@@ -111,7 +113,7 @@ async function handleAuth(event) {
 
   if (!submitBtn) return;
   const originalText = submitBtn.innerText;
-  submitBtn.innerText = 'Sending Magic Link...';
+  submitBtn.innerText = 'Sending code...';
   submitBtn.disabled = true;
 
   try {
@@ -132,14 +134,80 @@ async function handleAuth(event) {
 
     if (error) throw error;
 
-    alert('Magic link sent! Please check your TUT email inbox.');
-    closeAuthModal();
+    // Show the code box. Students can type the code OR click the link in the email.
+    pendingAuthEmail = email;
+    showCodeStep(true);
   } catch (err) {
     alert('Authentication Error: ' + err.message);
   } finally {
     submitBtn.innerText = originalText;
     submitBtn.disabled = false;
   }
+}
+
+
+// === SIGN-IN CODE + MICROSOFT SIGN-IN ===
+function showCodeStep(show) {
+  const authForm = document.getElementById('authForm');
+  const codeForm = document.getElementById('codeForm');
+  const ms = document.getElementById('msSection');
+  const help = document.getElementById('codeHelp');
+  if (authForm) authForm.style.display = show ? 'none' : '';
+  if (codeForm) codeForm.style.display = show ? '' : 'none';
+  if (ms) ms.style.display = show ? 'none' : '';
+  if (help && show) help.innerText = 'We sent a code to ' + pendingAuthEmail + '. Check your inbox and your Junk folder.';
+  const code = document.getElementById('authCode');
+  if (show && code) { code.value = ''; code.focus(); }
+}
+
+function backToEmailStep(event) {
+  if (event) event.preventDefault();
+  showCodeStep(false);
+}
+
+async function handleCodeVerify(event) {
+  if (event) event.preventDefault();
+  const token = document.getElementById('authCode')?.value.replace(/\s+/g, '');
+  const btn = document.getElementById('codeSubmitBtn');
+  if (!token || !pendingAuthEmail) return;
+
+  const original = btn.innerText;
+  btn.innerText = 'Checking...';
+  btn.disabled = true;
+  try {
+    const { error } = await supabaseClient.auth.verifyOtp({ email: pendingAuthEmail, token, type: 'email' });
+    if (error) throw error;
+    // onAuthStateChange (SIGNED_IN) closes the modal and loads the marketplace
+  } catch (err) {
+    alert('That code did not work: ' + err.message + '. Check the code, or go back and request a new one.');
+  } finally {
+    btn.innerText = original;
+    btn.disabled = false;
+  }
+}
+
+async function signInWithMicrosoft() {
+  try {
+    const siteUrl = window.location.origin + window.location.pathname.replace(/index\.html$/, '');
+    const { error } = await supabaseClient.auth.signInWithOAuth({
+      provider: 'azure',
+      options: { scopes: 'email', redirectTo: siteUrl }
+    });
+    if (error) throw error;
+  } catch (err) {
+    alert('Microsoft sign-in error: ' + err.message);
+  }
+}
+
+// If someone signs in with Microsoft using a non-TUT account, sign them straight back out
+function enforceTutEmail(user) {
+  const e = (user?.email || '').toLowerCase();
+  if (e && !e.endsWith('@tut4life.ac.za') && !e.endsWith('@tut.ac.za')) {
+    alert('Only TUT student accounts (@tut4life.ac.za) can use TechCompare OS.');
+    supabaseClient.auth.signOut();
+    return false;
+  }
+  return true;
 }
 
 function updateAuthUI(user) {
@@ -840,6 +908,7 @@ async function checkAuthSession() {
 
   supabaseClient.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_IN' && session) {
+      if (!enforceTutEmail(session.user)) return;
       currentUser = session.user;
       updateAuthUI(currentUser);
       closeAuthModal();

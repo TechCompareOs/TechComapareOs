@@ -43,9 +43,10 @@
   <!-- Public information pages (no login needed) -->
   <div class="info-nav">
     <button id="nav-about" onclick="switchTab('about')">About</button>
+    <button id="nav-persona" onclick="switchTab('persona')">Customer Persona</button>
     <button id="nav-research" onclick="switchTab('research')">Research</button>
     <button id="nav-contact" onclick="switchTab('contact')">Contact</button>
-    
+    <button id="nav-sources" onclick="switchTab('sources')">Sources</button>
   </div>
 
   <main>
@@ -198,7 +199,7 @@
             <input type="file" id="sellImage" accept="image/*">
           </div>
 
-          <p class="fee-note">Premium listing fee: <strong>R10 per device</strong>. This helps pay for protecting seller details and the website's security.<br>A listing stays live for <strong>30 days</strong>. After that it is hidden until you renew it from the My Listings tab.</p>
+          <p class="fee-note">Premium listing fee: <strong>R10 per device</strong>. This helps pay for protecting seller details and the website's security. Payments are not switched on in this prototype, so nothing is charged yet.<br>A listing stays live for <strong>30 days</strong>. After that it is hidden until you renew it from the My Listings tab.</p>
 
           <button class="btn-action" id="sellSubmitBtn" onclick="uploadProduct()">Publish to Campus Marketplace</button>
         </div>
@@ -223,6 +224,56 @@
         </div>
       </div>
 
+      <!-- CUSTOMER PERSONA TAB (public) -->
+      <div id="persona" class="tab-section">
+        <div class="form-box info-box">
+          <h2 class="info-title">Customer Persona</h2>
+          <p class="info-sub">A fictional persona that represents a typical TUT first-year student.</p>
+
+          <div class="persona-card">
+            <div class="persona-avatar" aria-hidden="true">L</div>
+            <div>
+              <h3>Lerato, 19</h3>
+              <p>First-year Diploma in ICT student</p>
+            </div>
+          </div>
+
+          <div class="persona-grid">
+            <div class="persona-block">
+              <h4>Needs</h4>
+              <ul>
+                <li>A reliable laptop with at least 8 GB RAM for programming</li>
+                <li>A budget of about R5,500</li>
+                <li>A phone that lasts the academic year</li>
+              </ul>
+            </div>
+            <div class="persona-block">
+              <h4>Frustrations</h4>
+              <ul>
+                <li>Worried about scams in open social media groups</li>
+                <li>Cannot tell if a second-hand price is fair</li>
+                <li>Does not want to share personal details with strangers</li>
+              </ul>
+            </div>
+            <div class="persona-block">
+              <h4>Goals</h4>
+              <ul>
+                <li>Buy from another verified student</li>
+                <li>Know the right specs for her course</li>
+                <li>Sell her old phone to help pay for the laptop</li>
+              </ul>
+            </div>
+            <div class="persona-block">
+              <h4>How she uses TechCompare OS</h4>
+              <ul>
+                <li>Checks the AI Advisor for specs within her budget</li>
+                <li>Browses the Marketplace and messages a seller</li>
+                <li>Uses the Trade-In Estimator, then lists her old phone</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <!-- RESEARCH TAB (public): five case studies -->
       <div id="research" class="tab-section">
@@ -271,7 +322,7 @@
           </div>
 
           <h3 class="info-heading">What we learned</h3>
-          <p>Every case involves a seller or shop that cannot be checked, urgency, and a payment that cannot be recovered. TechCompare OS responds with three things: verified student accounts, seller profiles with ratings and comments, and in-platform chat.</p>
+          <p>Every case involves a seller or shop that cannot be checked, urgency, and a payment that cannot be recovered. TechCompare OS responds with three things: verified student accounts, seller profiles with ratings and comments, and in-platform chat. Full references are on the Sources page.</p>
         </div>
       </div>
       
@@ -298,7 +349,41 @@
           <div id="contactResult" class="result-alert" hidden aria-live="polite"></div>
         </div>
       </div>
+
+      <!-- SOURCES TAB (public) -->
+      <div id="sources" class="tab-section">
+        <div class="form-box info-box">
+          <h2 class="info-title">Sources and Tools</h2>
+          <p class="info-sub">This site was written and built by the project group, and the logo is the group's own design. The case study summaries on the Research page are in the group's own words, based on the sources listed below.</p>
+
+          <h3 class="info-heading">Hosting, database and tools</h3>
+          <table class="info-table">
+            <thead>
+              <tr><th>Purpose</th><th>Tool</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Website hosting (HTTPS)</td><td>GitHub Pages</td></tr>
+              <tr><td>Database, magic-link login, picture storage and live chat</td><td>Supabase</td></tr>
+              <tr><td>Website code</td><td>HTML, CSS and JavaScript (supabase-js loaded from the jsDelivr CDN)</td></tr>
+            </tbody>
+          </table>
+          <p>Students sign in with a magic link sent to their TUT email, so no passwords are stored by the site.</p>
+
+          <h3 class="info-heading">Reference list</h3>
+          <ul class="ref-list">
+            <li>Egorov, Anatoly. 2026. "Broker Scammer Macro Venture – Review, Deception Scheme." <em>DNB Forex Review</em>, April 23, 2026. <a href="https://dnbreview.com/macro-venture/" target="_blank" rel="noopener noreferrer">https://dnbreview.com/macro-venture/</a>.</li>
+            <li>GitHub. n.d. <em>GitHub Pages Documentation</em>. <a href="https://docs.github.com/en/pages" target="_blank" rel="noopener noreferrer">https://docs.github.com/en/pages</a>.</li>
+            <li>Khourie, Taryn. 2026. "Scam Alert: Message Offering Applications for 'Students Laptop Scheme 2026' May Steal Your Personal Information." <em>Africa Check</em>, April 17, 2026. <a href="https://africacheck.org/fact-checks/meta-programme-fact-checks/scam-alert-message-offering-applications-students-laptop" target="_blank" rel="noopener noreferrer">https://africacheck.org/fact-checks/meta-programme-fact-checks/scam-alert-message-offering-applications-students-laptop</a>.</li>
+            <li>Marx, Matthias. 2024. "BogusBazaar: A Criminal Network of Webshop Fraudsters." <em>SRLabs Research</em>, August 5, 2024. <a href="https://srlabs.de/blog/bogusbazaar" target="_blank" rel="noopener noreferrer">https://srlabs.de/blog/bogusbazaar</a>.</li>
+            <li>Mudzanani, Lucia. 2026. "R700k Lost in Days as Wave of Scams Sweeps through eMalahleni." <em>The Witness</em>, June 5, 2026. <a href="https://witness.co.za/news/2026/06/05/r700k-lost-in-days-as-wave-of-scams-sweeps-through-emalahleni/" target="_blank" rel="noopener noreferrer">https://witness.co.za/news/2026/06/05/r700k-lost-in-days-as-wave-of-scams-sweeps-through-emalahleni/</a>.</li>
+            <li>Scheepers, Liezl. 2024. "Student-Targeted Scams: How to Stay Safe." <em>Parys Gazette</em>, November 26, 2024. <a href="https://www.citizen.co.za/parys-gazette/news/news-news/2024/11/26/student-targeted-scams-how-to-stay-safe/" target="_blank" rel="noopener noreferrer">https://www.citizen.co.za/parys-gazette/news/news-news/2024/11/26/student-targeted-scams-how-to-stay-safe/</a>.</li>
+            <li>Supabase. n.d. <em>Supabase Documentation</em>. <a href="https://supabase.com/docs" target="_blank" rel="noopener noreferrer">https://supabase.com/docs</a>.</li>
+            <li>Tshwane University of Technology, Faculty of ICT. 2026. <em>JGA 2026 Student Step-by-Step Guide</em>. Pretoria: Tshwane University of Technology.</li>
+          </ul>
+        </div>
       </div>
+
+    </div>
   </main>
 
   <!-- UNIFIED AUTHENTICATION MODAL -->
@@ -306,7 +391,7 @@
     <div class="modal-card">
       <button class="modal-close" onclick="closeAuthModal()" aria-label="Close">&times;</button>
       <h2 id="modalTitle" style="color:var(--tut-blue); margin-bottom:0.3rem;">Student Sign In</h2>
-      <p class="modal-sub">Use your verified TUT student email (@tut4life.ac.za). We'll email you a magic link, no password needed.</p>
+      <p class="modal-sub">Use your verified TUT student email (@tut4life.ac.za). We'll email you a short sign-in code, no password needed.</p>
 
       <form id="authForm" onsubmit="handleAuth(event)">
         <div class="form-group">
@@ -314,8 +399,26 @@
           <input type="email" id="authEmail" placeholder="e.g. 218000000@tut4life.ac.za" required>
         </div>
 
-        <button type="submit" class="btn-action" style="margin-top:1rem;" id="authSubmitBtn">Send Magic Link</button>
+        <button type="submit" class="btn-action" style="margin-top:1rem;" id="authSubmitBtn">Email Me a Sign-In Code</button>
       </form>
+
+      <!-- Step 2: type the code from the email (works even when the email link gets blocked) -->
+      <form id="codeForm" onsubmit="handleCodeVerify(event)" style="display:none;">
+        <p class="modal-sub" id="codeHelp">Enter the code we emailed you.</p>
+        <div class="form-group">
+          <label for="authCode">Sign-in code</label>
+          <input type="text" id="authCode" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="Enter the code" required>
+        </div>
+        <button type="submit" class="btn-action" style="margin-top:1rem;" id="codeSubmitBtn">Verify &amp; Sign In</button>
+        <p style="text-align:center;margin-top:0.8rem;font-size:0.85rem;">
+          <a href="#" onclick="backToEmailStep(event)">Use a different email / resend</a>
+        </p>
+      </form>
+
+      <div id="msSection">
+        <p style="text-align:center;margin:1rem 0 0.5rem;font-size:0.85rem;opacity:0.7;">or</p>
+        <button type="button" class="btn-action" onclick="signInWithMicrosoft()" id="msBtn">Sign in with Microsoft (TUT account)</button>
+      </div>
 
       <div class="auth-toggle">
         <span id="toggleText">Don't have an account?</span>
