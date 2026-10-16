@@ -1,6 +1,7 @@
-// === SUPABASE INITIALIZATION ===
+﻿// === SUPABASE INITIALIZATION ===
 const SUPABASE_URL = "https://hizmjehkwbgmrlxezvcl.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_NvyZ8UYqTfZ5kQOhI87z0w_tOBpX9Ha";
+const PAYMENTS_API = 'https://techcomapareos.onrender.com'; // <- your Python payments server URL (see SETUP.md)
 const IMAGE_BUCKET = 'product-images';
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB
 const LISTING_DAYS = 30;                 // a listing stays live this long unless the seller renews it
@@ -367,7 +368,8 @@ function renderProductCards(products) {
 
     const action = isOwn
       ? '<p class="own-listing">This is your listing</p>'
-      : `<button class="btn-primary btn-chat" data-seller="${escapeHtml(sellerEmail)}" data-product="${escapeHtml(item.id)}">💬 Message Seller</button>`;
+      : `<button class="btn-primary btn-buy" data-product="${escapeHtml(item.id)}" style="margin-bottom:0.4rem;">🛒 Buy Now (secure, with delivery)</button>
+         <button class="btn-primary btn-chat" data-seller="${escapeHtml(sellerEmail)}" data-product="${escapeHtml(item.id)}">💬 Message Seller</button>`;
 
     return `
       <div class="listing-card">
@@ -883,6 +885,13 @@ function toggleBot() {
 // === EVENT WIRING ===
 // Card buttons carry their data in attributes, so nothing user-supplied is put inside inline JS.
 document.addEventListener('click', event => {
+  const buyBtn = event.target.closest('.btn-buy');
+  if (buyBtn) {
+    if (!currentUser) { openAuthModal(); return; }
+    const product = allProducts.find(p => String(p.id) === buyBtn.dataset.product);
+    if (product && typeof TechCheckout !== 'undefined') TechCheckout.buy(product);
+  }
+
   const chatBtn = event.target.closest('.btn-chat');
   if (chatBtn) openChat(chatBtn.dataset.seller, chatBtn.dataset.product);
 
@@ -938,5 +947,9 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   runRevenueCalc();
+  if (typeof TechCheckout !== 'undefined') {
+    TechCheckout.init(supabaseClient, PAYMENTS_API);
+    TechCheckout.handleReturn();
+  }
   checkAuthSession(); // also loads the listings, once the session is known
 });
