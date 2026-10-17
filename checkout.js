@@ -73,11 +73,29 @@ const TechCheckout = (() => {
 
   function buy(product) {
     const { box } = modal("Checkout: " + (product.title || product.name || "Item"));
-    box.append(
-      field("Full name", "name"), field("Cell number", "phone", { type: "tel", max: 15 }),
-      ...addrFields(), btn("Get delivery options", getRates), msg(box)
-    );
-    const out = el("div"); box.append(out);
+    const isCollect = () => box.querySelector('input[name="method"]:checked')?.value === "collect";
+
+    const methodBox = el("div", { style: "margin:4px 0 12px;font-size:14px" },
+      el("label", { style: "display:block;margin:4px 0" },
+        el("input", { type: "radio", name: "method", value: "courier", checked: true, onchange: sync }), " Courier delivery"),
+      el("label", { style: "display:block;margin:4px 0" },
+        el("input", { type: "radio", name: "method", value: "collect", onchange: sync }), " Collect from the seller (free)"));
+    const addrBox = el("div", {}, ...addrFields(), btn("Get delivery options", getRates));
+    const out = el("div");
+
+    box.append(field("Full name", "name"), field("Cell number", "phone", { type: "tel", max: 15 }),
+      methodBox, addrBox, out, msg(box));
+
+    function sync() {
+      msg(box).textContent = "";
+      out.replaceChildren();
+      addrBox.style.display = isCollect() ? "none" : "";
+      if (isCollect()) {
+        out.append(
+          el("p", { textContent: `Item ${rand(Math.round(Number(product.price) * 100))}. No delivery fee. After paying you'll get the seller's contact details to arrange collection.`, style: "font-size:13px;color:#555" }),
+          btn("Pay with PayFast", pay));
+      }
+    }
 
     async function getRates() {
       msg(box).textContent = "Fetching Courier Guy rates...";
@@ -94,11 +112,12 @@ const TechCheckout = (() => {
     }
 
     async function pay() {
-      const code = box.querySelector('input[name="rate"]:checked')?.value;
+      const collect = isCollect();
+      const code = collect ? "COLLECT" : box.querySelector('input[name="rate"]:checked')?.value;
       msg(box).textContent = "Preparing secure payment...";
       try {
         const r = await call("create-payment", {
-          product_id: product.id, address: addr(box), service_level_code: code,
+          product_id: product.id, address: collect ? {} : addr(box), service_level_code: code,
           name: val(box, "name"), phone: val(box, "phone"),
         });
         const form = el("form", { method: "POST", action: r.action });
@@ -133,23 +152,71 @@ const TechCheckout = (() => {
     }
   }
 
+  const note = (box, text, bold) => box.append(el("p", { textContent: text, style: bold ? "font-weight:600" : "font-size:14px" }));
+
+  async function showContact(box, orderId) {
+    try {
+      const c = await call("order-contact", { order_id: orderId });
+      note(box, "Collect from: " + c.name, true);
+      note(box, "Cell: " + c.phone);
+      note(box, "Pickup area: " + c.pickup);
+      note(box, "Agree a time with the seller by phone, or use Messages (" + c.email.split("@")[0] + ").");
+    } catch (e) { note(box, e.message); }
+  }
+
   async function handleReturn() {
     const q = new URLSearchParams(location.search);
     const state = q.get("payment");
     if (!state) return;
     history.replaceState(null, "", location.pathname);
     const { box } = modal(state === "success" ? "Thanks, payment received" : "Payment cancelled");
-    box.append(el("p", { textContent: state === "success"
-      ? "We're confirming your payment and booking The Courier Guy. Your tracking reference will appear in your orders shortly."
-      : "No money was taken. You can try again from the listing." }));
-    if (state === "success" && q.get("order")) {
-      for (let i = 0; i < 6; i++) {
-        const { data } = await sb.from("orders").select("status,tracking_reference").eq("id", q.get("order")).maybeSingle();
-        if (data?.tracking_reference) { box.append(el("p", { textContent: "Tracking reference: " + data.tracking_reference, style: "font-weight:600" })); break; }
-        await new Promise((r) => setTimeout(r, 3000));
-      }
+    if (state !== "success") {
+      note(box, "No money was taken. You can try again from the listing.");
+      return;
     }
+    note(box, "We're confirming your payment...");
+    const id = q.get("order");
+    if (!id) return;
+    for (let i = 0; i < 8; i++) {
+      const { data } = await sb.from("orders").select("status,service_level_code,tracking_reference").eq("id", id).maybeSingle();
+      if (data?.status === "paid") {
+        if (data.service_level_code === "COLLECT") { await showContact(box, id); }
+        else if (data.tracking_reference) { note(box, "Tracking reference: " + data.tracking_reference, true); }
+        else { note(box, "Payment confirmed. Your courier is being arranged, and you'll find it under My Orders."); }
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+    note(box, "Your payment is still being confirmed. Check My Orders in a minute.");
   }
 
-  return { init: (client, apiBase) => { sb = client; api = String(apiBase || '').replace(/\/$/, ''); }, buy, sellerSetup, handleReturn };
+  async function myOrders() {
+    const { data: u } = await sb.auth.getUser();
+    const me = u?.user?.email?.toLowerCase();
+    if (!me) return alert("Please sign in first");
+    const { box } = modal("My orders");
+    const { data, error } = await sb.from("orders").select("*").eq("status", "paid").order("created_at", { ascending: false }).limit(50);
+    if (error) { note(box, "Could not load your orders."); return; }
+    if (!data?.length) { note(box, "No paid orders yet."); return; }
+    data.forEach((o) => {
+      const sold = o.seller_email.toLowerCase() === me;
+      const collect = o.service_level_code === "COLLECT";
+      const card = el("div", { style: "border:1px solid #ccd;border-radius:8px;padding:10px;margin-bottom:10px;font-size:14px" });
+      card.append(el("strong", { textContent: (sold ? "SOLD: " : "BOUGHT: ") + (o.product_title || "Item") }));
+      const line = (t) => card.append(el("div", { textContent: t }));
+      line(sold ? `You receive ${rand(o.item_cents - o.fee_cents)}` : `You paid ${rand(o.total_cents)}`);
+      line(new Date(o.paid_at || o.created_at).toLocaleDateString());
+      if (sold) {
+        line(`Buyer: ${o.buyer_name}, ${o.buyer_phone}`);
+        line(collect ? "Collection: arrange a time with the buyer." : (o.tracking_reference ? "Courier tracking: " + o.tracking_reference : "Pack the item. The courier will collect from your saved pickup address."));
+      } else if (collect) {
+        card.append(el("button", { textContent: "Show seller contact", style: "margin-top:6px;padding:6px 10px;cursor:pointer", onclick: (ev) => { ev.target.remove(); showContact(card, o.id); } }));
+      } else {
+        line(o.tracking_reference ? "Tracking: " + o.tracking_reference : "Courier is being arranged.");
+      }
+      box.append(card);
+    });
+  }
+
+  return { myOrders, init: (client, apiBase) => { sb = client; api = String(apiBase || '').replace(/\/$/, ''); }, buy, sellerSetup, handleReturn };
 })();

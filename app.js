@@ -222,6 +222,7 @@ function updateAuthUI(user) {
     const studentNum = escapeHtml((user.email || 'Student').split('@')[0]);
     container.innerHTML = `
       <span class="user-badge">👤 ${studentNum}</span>
+      <button class="btn-primary" onclick="TechCheckout.myOrders()">📦 My Orders</button>
       <button class="btn-primary" onclick="openInbox()" id="inboxBtn">📩 Messages <span id="inboxBadge" style="display:none;background:#c00;color:#fff;border-radius:10px;padding:0 6px;font-size:0.75rem;margin-left:4px;"></span></button>
       <button class="btn-primary" onclick="logoutUser()">Log Out</button>
     `;
