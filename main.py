@@ -173,6 +173,11 @@ def parcel_for(category: str | None) -> dict:
             "submitted_height_cm": h, "submitted_weight_kg": kg}
 
 
+def split_mode() -> bool:
+    """manual (default): TechCompare receives all money and pays sellers. split: PayFast split payments."""
+    return os.environ.get("PAYOUT_MODE", "manual").lower() == "split"
+
+
 def courier_live() -> bool:
     """True only when a real Courier Guy token is set (and flat mode isn't forced)."""
     t = os.environ.get("SHIPLOGIC_TOKEN", "").strip()
@@ -247,7 +252,13 @@ async def load_listing(product_id: str, buyer: str):
     s = await sb("GET", "seller_profiles", params={"seller_email": f"eq.{seller_email}", "select": "*"})
     if not s:
         raise ApiError("This seller hasn't set up payouts yet, so it can't be bought online")
-    return p, s[0]
+    s = s[0]
+    if split_mode():
+        if not s.get("payfast_merchant_id"):
+            raise ApiError("This seller hasn't set up payouts yet, so it can't be bought online")
+    elif not (s.get("account_number") and s.get("bank_name")):
+        raise ApiError("This seller hasn't added bank details yet, so it can't be bought online")
+    return p, s
 
 
 # ---------------------------------------------------------------- routes
@@ -293,7 +304,7 @@ async def create_payment(request: Request):
     fee_cents = round(item_cents * fee_pct / 100)
     seller_cents = item_cents - fee_cents       # seller gets item price minus platform fee
     total_cents = item_cents + ship_cents       # platform keeps fee + shipping (pays the courier)
-    if seller_cents < 100:
+    if split_mode() and seller_cents < 100:
         raise ApiError("Price too low for a split payment")
 
     title = str(p.get("title") or p.get("name") or "TechCompare item")[:100]
@@ -302,14 +313,14 @@ async def create_payment(request: Request):
         "seller_email": str(p["seller_email"]).lower(), "buyer_name": name, "buyer_phone": phone,
         "delivery_address": delivery, "service_level_code": rate["code"],
         "service_level_name": rate["name"], "item_cents": item_cents, "shipping_cents": ship_cents,
-        "fee_cents": fee_cents, "total_cents": total_cents})
+        "fee_cents": fee_cents, "total_cents": total_cents, "payout_cents": seller_cents})
     order_id = rows[0]["id"]
 
     site = env("SITE_URL").rstrip("/")
     first, _, last = name.partition(" ")
     setup = json.dumps({"split_payment": {"merchant_id": int(s["payfast_merchant_id"]),
                                           "amount": seller_cents, "min": 100, "max": seller_cents}},
-                       separators=(",", ":"))
+                       separators=(",", ":")) if split_mode() else ""
 
     # ORDER MATTERS: PayFast's documented field order (also used for the signature)
     pairs = [
@@ -351,6 +362,24 @@ async def order_contact(request: Request):
     s = s[0]
     return {"name": s["full_name"], "phone": s["phone"], "email": s["seller_email"],
             "pickup": f"{s['street_address']}, {s['local_area']}, {s['city']}"}
+
+
+@app.post("/confirm-received")
+async def confirm_received(request: Request):
+    """Buyer confirms they got the item, which makes the seller's payout ready."""
+    buyer = await current_buyer(request)
+    order_id = str((await request.json()).get("order_id", ""))
+    if not UUID_RE.match(order_id):
+        raise ApiError("Order not found", 404)
+    done = await sb("PATCH", "orders",
+                    params={"id": f"eq.{order_id}", "buyer_email": f"eq.{buyer}",
+                            "status": "eq.paid", "payout_status": "eq.held"},
+                    prefer="return=representation",
+                    body={"payout_status": "ready",
+                          "buyer_confirmed_at": datetime.now(timezone.utc).isoformat()})
+    if not done:
+        raise ApiError("This order can't be confirmed (already confirmed or not paid)")
+    return {"ok": True}
 
 
 @app.post("/payfast-itn")
