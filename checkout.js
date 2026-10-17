@@ -132,22 +132,42 @@ const TechCheckout = (() => {
     const { data: u } = await sb.auth.getUser();
     const email = u?.user?.email?.toLowerCase();
     if (!email) return alert("Please sign in first");
+    const BANKS = ["Capitec", "FNB", "Standard Bank", "Absa", "Nedbank", "TymeBank", "Discovery Bank", "African Bank", "Other"];
     const { box, close } = modal("Get paid & courier pickup");
     box.append(
-      el("p", { textContent: "Buyers pay through PayFast and you receive your share directly into your PayFast account. The Courier Guy collects from the address below.", style: "font-size:13px" }),
+      el("p", { textContent: "Buyers pay TechCompare OS. After the buyer confirms they received the item (or 7 days after payment), we pay the sale price minus our fee to your bank account by EFT. The courier collects from the address below.", style: "font-size:13px" }),
       field("Full name", "full_name"), field("Cell number", "phone", { type: "tel", max: 15 }),
-      field("PayFast merchant ID", "payfast_merchant_id", { max: 12 }),
+      field("Bank", "bank_name", { options: BANKS }), field("Account holder name", "account_holder"),
+      field("Account number", "account_number", { type: "tel", max: 16 }),
+      field("Account type", "account_type", { options: ["Savings", "Cheque"] }),
+      field("Branch code (6 digits, your bank's universal code)", "branch_code", { type: "tel", max: 6 }),
       ...addrFields(), btn("Save", save), msg(box)
     );
+
+    // Fill in what the seller saved before
+    const { data: old } = await sb.from("seller_profiles").select("*").eq("seller_email", email).maybeSingle();
+    if (old) {
+      ["full_name", "phone", "bank_name", "account_holder", "account_number", "account_type", "branch_code",
+       "street_address", "local_area", "city", "province", "postal_code"].forEach((k) => {
+        const f = box.querySelector(`[name="${k}"]`);
+        if (f && old[k]) f.value = old[k];
+      });
+    }
+
     async function save() {
       const row = {
         seller_email: email, full_name: val(box, "full_name"),
         phone: val(box, "phone").replace(/[^\d+]/g, ""),
-        payfast_merchant_id: val(box, "payfast_merchant_id"), ...addr(box),
-        updated_at: new Date().toISOString(),
+        bank_name: val(box, "bank_name"), account_holder: val(box, "account_holder"),
+        account_number: val(box, "account_number").replace(/\s/g, ""),
+        account_type: val(box, "account_type"), branch_code: val(box, "branch_code").replace(/\s/g, ""),
+        ...addr(box), updated_at: new Date().toISOString(),
       };
+      if (!/^\d{6,16}$/.test(row.account_number)) { msg(box).textContent = "Account number must be 6 to 16 digits."; return; }
+      if (!/^\d{6}$/.test(row.branch_code)) { msg(box).textContent = "Branch code must be 6 digits."; return; }
+      if (row.account_holder.length < 2) { msg(box).textContent = "Enter the account holder's name."; return; }
       const { error } = await sb.from("seller_profiles").upsert(row);
-      if (error) msg(box).textContent = "Check your details: " + error.message;
+      if (error) { msg(box).style.color = "#b00020"; msg(box).textContent = "Check your details: " + error.message; }
       else { msg(box).style.color = "#0a7d2c"; msg(box).textContent = "Saved. Buyers can now pay you online."; setTimeout(close, 1200); }
     }
   }
@@ -209,10 +229,22 @@ const TechCheckout = (() => {
       if (sold) {
         line(`Buyer: ${o.buyer_name}, ${o.buyer_phone}`);
         line(collect ? "Collection: arrange a time with the buyer." : (o.tracking_reference ? "Courier tracking: " + o.tracking_reference : "Pack the item. The courier will collect from your saved pickup address."));
+        line(o.payout_status === "paid" ? "Payout: paid to your bank account." : o.payout_status === "ready"
+          ? "Payout: approved, we will transfer it soon." : "Payout: held until the buyer confirms receipt, or 7 days after payment.");
       } else if (collect) {
         card.append(el("button", { textContent: "Show seller contact", style: "margin-top:6px;padding:6px 10px;cursor:pointer", onclick: (ev) => { ev.target.remove(); showContact(card, o.id); } }));
       } else {
         line(o.tracking_reference ? "Tracking: " + o.tracking_reference : "Courier is being arranged.");
+      }
+      if (!sold && o.payout_status === "held") {
+        card.append(el("button", { textContent: "✅ I received my item", style: "margin-top:8px;padding:6px 10px;cursor:pointer;display:block",
+          onclick: async (ev) => {
+            const b = ev.target;
+            if (!confirm("Only confirm if you have the item and it is as described. This releases the seller's payment.")) return;
+            b.disabled = true;
+            try { await call("confirm-received", { order_id: o.id }); b.replaceWith(el("div", { textContent: "Thanks, receipt confirmed.", style: "margin-top:8px" })); }
+            catch (e) { b.disabled = false; alert(e.message); }
+          } }));
       }
       box.append(card);
     });
