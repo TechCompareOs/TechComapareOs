@@ -1,7 +1,7 @@
-﻿// === SUPABASE INITIALIZATION ===
+// === SUPABASE INITIALIZATION ===
 const SUPABASE_URL = "https://hizmjehkwbgmrlxezvcl.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_NvyZ8UYqTfZ5kQOhI87z0w_tOBpX9Ha";
-const PAYMENTS_API = 'https://techcomapareos.onrender.com'; // <- your Python payments server URL (see SETUP.md)
+const PAYMENTS_API = 'https://YOUR-APP-NAME.onrender.com'; // <- your Python payments server URL (see SETUP.md)
 const IMAGE_BUCKET = 'product-images';
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB
 const LISTING_DAYS = 30;                 // a listing stays live this long unless the seller renews it
@@ -889,7 +889,9 @@ document.addEventListener('click', event => {
   if (buyBtn) {
     if (!currentUser) { openAuthModal(); return; }
     const product = allProducts.find(p => String(p.id) === buyBtn.dataset.product);
-    if (product && typeof TechCheckout !== 'undefined') TechCheckout.buy(product);
+    if (typeof TechCheckout === 'undefined') { alert('Checkout is not loaded. Upload checkout.js to the same folder as index.html on the main branch, then hard-refresh.'); return; }
+    if (!product) { alert('Could not find this listing. Refresh the page and try again.'); return; }
+    TechCheckout.buy(product);
   }
 
   const chatBtn = event.target.closest('.btn-chat');
