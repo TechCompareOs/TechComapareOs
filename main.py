@@ -63,8 +63,10 @@ async def health():
 
 # ---------------------------------------------------------------- Supabase
 def _sb_headers(prefer: str | None = None) -> dict:
-    key = env("SUPABASE_SERVICE_ROLE_KEY")
-    h = {"apikey": key, "Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+    key = env("SUPABASE_SERVICE_ROLE_KEY").strip()
+    h = {"apikey": key, "Content-Type": "application/json"}
+    if not key.startswith("sb_secret_"):  # new-style secret keys are not JWTs, so they go in apikey only
+        h["Authorization"] = f"Bearer {key}"
     if prefer:
         h["Prefer"] = prefer
     return h
@@ -75,7 +77,7 @@ async def sb(method: str, table: str, params: dict | None = None, body=None, pre
                            params=params, json=body, headers=_sb_headers(prefer))
     if r.status_code >= 300:
         print("Supabase error", r.status_code, r.text[:300])
-        raise ApiError("Database error, please try again", 500)
+        raise ApiError(f"Database error ({r.status_code}) on '{table}'. Check the Render logs.", 500)
     return r.json() if r.content else []
 
 
