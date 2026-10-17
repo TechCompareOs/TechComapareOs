@@ -1,7 +1,7 @@
 // === SUPABASE INITIALIZATION ===
 const SUPABASE_URL = "https://hizmjehkwbgmrlxezvcl.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_NvyZ8UYqTfZ5kQOhI87z0w_tOBpX9Ha";
-const PAYMENTS_API = 'https://techcomapareos.onrender.com
+const PAYMENTS_API = 'https://YOUR-APP-NAME.onrender.com'; // <- your Python payments server URL (see SETUP.md)
 const IMAGE_BUCKET = 'product-images';
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB
 const LISTING_DAYS = 30;                 // a listing stays live this long unless the seller renews it
@@ -222,8 +222,10 @@ function updateAuthUI(user) {
     const studentNum = escapeHtml((user.email || 'Student').split('@')[0]);
     container.innerHTML = `
       <span class="user-badge">👤 ${studentNum}</span>
+      <button class="btn-primary" onclick="openInbox()" id="inboxBtn">📩 Messages <span id="inboxBadge" style="display:none;background:#c00;color:#fff;border-radius:10px;padding:0 6px;font-size:0.75rem;margin-left:4px;"></span></button>
       <button class="btn-primary" onclick="logoutUser()">Log Out</button>
     `;
+    if (typeof ensureChatSubscription === 'function') { ensureChatSubscription(); refreshInboxBadge(); }
   } else {
     container.innerHTML = `
       <button class="btn-primary" onclick="openAuthModal()">Sign In</button>
@@ -363,7 +365,7 @@ function renderProductCards(products) {
     const title = item.title || item.name || 'Untitled device';
     const sellerEmail = item.seller_email || item.seller_id || '';
     const sellerLabel = String(sellerEmail).split('@')[0] || 'Student';
-    const isOwn = currentUser && currentUser.email && currentUser.email === sellerEmail;
+    const isOwn = currentUser && currentUser.email && mailKey(currentUser.email) === mailKey(sellerEmail);
     const description = item.description ? `<p class="card-desc">${escapeHtml(item.description)}</p>` : '';
 
     const action = isOwn
@@ -400,7 +402,7 @@ function renderMyListings() {
     return;
   }
 
-  const mine = allProducts.filter(item => item.seller_email === currentUser.email);
+  const mine = allProducts.filter(item => mailKey(item.seller_email) === mailKey(currentUser.email));
   const live = mine.filter(isLive).length;
   const sold = mine.filter(isSold).length;
   const expired = mine.filter(item => !isSold(item) && isExpired(item)).length;
@@ -619,25 +621,111 @@ async function uploadProduct() {
   }
 }
 
-// === REALTIME CHAT ===
+// === REALTIME CHAT + INBOX ===
+const mailKey = e => String(e || '').trim().toLowerCase();
+const myEmail = () => mailKey(currentUser && currentUser.email);
+let inboxPoll = null;
+
+function seenStore() {
+  try { return JSON.parse(localStorage.getItem('tc_seen_' + myEmail()) || '{}'); } catch (_) { return {}; }
+}
+function markSeen(partner) {
+  try {
+    const s = seenStore();
+    s[mailKey(partner)] = new Date().toISOString();
+    localStorage.setItem('tc_seen_' + myEmail(), JSON.stringify(s));
+  } catch (_) {}
+}
+
+// All of my messages, newest first. (The database also restricts this to messages I sent or received.)
+async function fetchMyMessages() {
+  if (!supabaseClient || !currentUser) return [];
+  const { data, error } = await supabaseClient
+    .from('messages').select('*')
+    .order('created_at', { ascending: false }).limit(500);
+  if (error) { console.error('Error loading messages:', error); return []; }
+  const me = myEmail();
+  return (data || []).filter(m => mailKey(m.sender_email) === me || mailKey(m.receiver_email) === me);
+}
+
+function groupConversations(messages) {
+  const me = myEmail();
+  const seen = seenStore();
+  const map = new Map();
+  for (const m of messages) { // newest first, so the first one we see per person is the latest
+    const partner = mailKey(m.sender_email) === me ? mailKey(m.receiver_email) : mailKey(m.sender_email);
+    if (!partner || map.has(partner)) continue;
+    const fromThem = mailKey(m.sender_email) !== me;
+    const unread = fromThem && (!seen[partner] || new Date(m.created_at) > new Date(seen[partner]));
+    map.set(partner, { partner, last: m, unread });
+  }
+  return [...map.values()];
+}
+
+async function refreshInboxBadge() {
+  const badge = document.getElementById('inboxBadge');
+  if (!badge || !currentUser) return;
+  const convos = groupConversations(await fetchMyMessages());
+  const n = convos.filter(c => c.unread).length;
+  badge.textContent = n ? String(n) : '';
+  badge.style.display = n ? 'inline-block' : 'none';
+}
+
+async function renderInbox() {
+  const list = document.getElementById('inboxList');
+  if (!list) return;
+  const convos = groupConversations(await fetchMyMessages());
+  if (!convos.length) {
+    list.innerHTML = '<p class="empty-note">No messages yet. When a student messages you about a listing, it will show up here.</p>';
+    return;
+  }
+  list.innerHTML = convos.map(c => {
+    const snippet = escapeHtml(String(c.last.message_text || '').slice(0, 60));
+    const when = new Date(c.last.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
+    return `<button type="button" class="inbox-item" data-partner="${escapeHtml(c.partner)}" data-product="${escapeHtml(c.last.product_id ?? '')}"
+      onclick="openConversation(this.dataset.partner, this.dataset.product)"
+      style="display:block;width:100%;text-align:left;padding:0.7rem;margin-bottom:0.5rem;border:1px solid #ccd;border-radius:8px;background:${c.unread ? '#fff6dd' : '#fff'};cursor:pointer;">
+      <strong>${escapeHtml(c.partner.split('@')[0])}</strong>${c.unread ? ' <span style="color:#c00;font-size:0.8rem;">● new</span>' : ''}
+      <span style="float:right;font-size:0.75rem;opacity:0.7;">${escapeHtml(when)}</span><br>
+      <span style="font-size:0.85rem;opacity:0.8;">${snippet}</span></button>`;
+  }).join('');
+}
+
+function openInbox() {
+  if (!currentUser) { openAuthModal(); return; }
+  const modal = document.getElementById('inboxModal');
+  if (modal) modal.style.display = 'flex';
+  renderInbox();
+}
+function closeInbox() {
+  const modal = document.getElementById('inboxModal');
+  if (modal) modal.style.display = 'none';
+}
+function openConversation(partner, productId) {
+  closeInbox();
+  openChat(partner, productId || null);
+}
+
 function openChat(sellerEmail, productId) {
   if (!currentUser) {
     alert('Please sign in to message sellers.');
     openAuthModal();
     return;
   }
-  if (!sellerEmail) return alert('This listing has no seller contact.');
-  if (currentUser.email === sellerEmail) return alert('This is your own listing!');
+  const partner = mailKey(sellerEmail);
+  if (!partner) return alert('This listing has no seller contact.');
+  if (partner === myEmail()) return alert('This is your own listing!');
 
-  activeChatPartner = sellerEmail;
-  activeProductId = productId;
+  activeChatPartner = partner;
+  activeProductId = productId || null;
 
   const titleEl = document.getElementById('chatRecipientTitle');
-  if (titleEl) titleEl.innerText = `Chat with ${sellerEmail.split('@')[0]}`;
+  if (titleEl) titleEl.innerText = `Chat with ${partner.split('@')[0]}`;
 
   const modalEl = document.getElementById('chatModal');
   if (modalEl) modalEl.style.display = 'flex';
 
+  markSeen(partner);
   loadChatMessages();
   ensureChatSubscription();
 }
@@ -645,39 +733,42 @@ function openChat(sellerEmail, productId) {
 function closeChat() {
   const modalEl = document.getElementById('chatModal');
   if (modalEl) modalEl.style.display = 'none';
+  if (activeChatPartner) markSeen(activeChatPartner);
   activeChatPartner = null;
   activeProductId = null;
+  refreshInboxBadge();
 }
 
 async function loadChatMessages() {
   if (!supabaseClient || !currentUser || !activeChatPartner) return;
 
-  const me = currentUser.email;
+  const me = myEmail();
   const partner = activeChatPartner;
-
-  const { data: messages, error } = await supabaseClient
-    .from('messages')
-    .select('*')
-    .or(`and(sender_email.eq.${me},receiver_email.eq.${partner}),and(sender_email.eq.${partner},receiver_email.eq.${me})`)
-    .order('created_at', { ascending: true });
-
-  if (error) return console.error('Error loading chat:', error);
+  const all = await fetchMyMessages();
   if (partner !== activeChatPartner) return; // chat was closed or switched meanwhile
+
+  const messages = all
+    .filter(m => {
+      const s = mailKey(m.sender_email), r = mailKey(m.receiver_email);
+      return (s === me && r === partner) || (s === partner && r === me);
+    })
+    .reverse(); // oldest first
 
   const chatBox = document.getElementById('chatBox');
   if (!chatBox) return;
 
-  if (!messages || messages.length === 0) {
+  if (messages.length === 0) {
     chatBox.innerHTML = '<p class="empty-note">No messages yet. Say hello!</p>';
     return;
   }
 
   chatBox.innerHTML = messages.map(msg => {
-    const isMe = msg.sender_email === me;
+    const isMe = mailKey(msg.sender_email) === me;
     return `<div class="chat-msg ${isMe ? 'sent' : 'received'}"><p>${escapeHtml(msg.message_text)}</p></div>`;
   }).join('');
 
   chatBox.scrollTop = chatBox.scrollHeight;
+  markSeen(partner);
 }
 
 async function sendMessage() {
@@ -689,7 +780,7 @@ async function sendMessage() {
   const { error } = await supabaseClient
     .from('messages')
     .insert([{
-      sender_email: currentUser.email,
+      sender_email: myEmail(),
       receiver_email: activeChatPartner,
       product_id: activeProductId,
       message_text: text
@@ -703,21 +794,25 @@ async function sendMessage() {
   }
 }
 
-// Creates the realtime channel only once; later calls do nothing.
+// Creates the realtime channel once (plus a 30s fallback check); later calls do nothing.
 function ensureChatSubscription() {
   if (!supabaseClient || chatChannel) return;
 
   chatChannel = supabaseClient
     .channel('public:messages')
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
-      if (!currentUser || !activeChatPartner) return;
+      if (!currentUser) return;
       const msg = payload.new;
-      const involvesThisChat =
-        (msg.sender_email === activeChatPartner && msg.receiver_email === currentUser.email) ||
-        (msg.sender_email === currentUser.email && msg.receiver_email === activeChatPartner);
-      if (involvesThisChat) loadChatMessages();
+      const me = myEmail(), s = mailKey(msg.sender_email), r = mailKey(msg.receiver_email);
+      if (s !== me && r !== me) return;
+      if (activeChatPartner && (s === activeChatPartner || r === activeChatPartner)) loadChatMessages();
+      refreshInboxBadge();
+      const inbox = document.getElementById('inboxModal');
+      if (inbox && inbox.style.display === 'flex') renderInbox();
     })
     .subscribe();
+
+  if (!inboxPoll) inboxPoll = setInterval(refreshInboxBadge, 30000);
 }
 
 function teardownChatSubscription() {
@@ -725,6 +820,7 @@ function teardownChatSubscription() {
     supabaseClient.removeChannel(chatChannel);
   }
   chatChannel = null;
+  if (inboxPoll) { clearInterval(inboxPoll); inboxPoll = null; }
 }
 
 // === TRADE-IN ESTIMATOR ===
