@@ -220,7 +220,7 @@ function updateAuthUI(user) {
   if (user) {
     const studentNum = escapeHtml((user.email || 'Student').split('@')[0]);
     container.innerHTML = `
-      <span class="user-badge">👤 ${studentNum}</span>
+      <span class="user-badge">${studentNum}</span>
       <button class="btn-primary" onclick="logoutUser()">Log Out</button>
     `;
   } else {
