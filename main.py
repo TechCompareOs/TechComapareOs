@@ -173,7 +173,25 @@ def parcel_for(category: str | None) -> dict:
             "submitted_height_cm": h, "submitted_weight_kg": kg}
 
 
+def courier_live() -> bool:
+    """True only when a real Courier Guy token is set (and flat mode isn't forced)."""
+    t = os.environ.get("SHIPLOGIC_TOKEN", "").strip()
+    return bool(t) and t.lower() != "placeholder" and os.environ.get("COURIER_MODE", "auto").lower() != "flat"
+
+
+def flat_rate(product: dict) -> list[dict]:
+    """Temporary fixed delivery fee, used until the Courier Guy account is ready."""
+    c = str(product.get("category") or "").lower()
+    defaults = {"laptop": 130, "phone": 90, "smartphone": 90, "tablet": 100}
+    rands = float(os.environ.get("FLAT_DELIVERY_RANDS") or next(
+        (v for k, v in defaults.items() if c.startswith(k)), 120))
+    return [{"code": "FLAT", "name": "Courier Guy delivery (flat rate)", "amount": rands,
+             "cents": round(rands * 100), "delivery_from": None}]
+
+
 async def quote(seller: dict, delivery: dict, product: dict) -> list[dict]:
+    if not courier_live():
+        return flat_rate(product)
     tomorrow = (datetime.now(timezone.utc) + timedelta(days=1)).strftime("%Y-%m-%d")
     try:
         res = await shiplogic("/rates", {
@@ -249,7 +267,8 @@ async def courier_rates(request: Request):
 async def create_payment(request: Request):
     buyer = await current_buyer(request)
     body = await request.json()
-    delivery = clean_address(body.get("address"))
+    collect = body.get("service_level_code") == "COLLECT"
+    delivery = {"collection": True} if collect else clean_address(body.get("address"))
     name = str(body.get("name", "")).strip()[:100]
     phone = re.sub(r"[^\d+]", "", str(body.get("phone", "")))[:15]
     if len(name) < 2:
@@ -260,10 +279,13 @@ async def create_payment(request: Request):
     p, s = await load_listing(str(body.get("product_id", "")), buyer)
 
     # Re-quote on the server so the shipping price can't be tampered with in the browser
-    rates = await quote(s, delivery, p)
-    rate = next((r for r in rates if r["code"] == body.get("service_level_code")), None)
-    if not rate:
-        raise ApiError("That delivery option is no longer available, please refresh the rates")
+    if collect:
+        rate = {"code": "COLLECT", "name": "Collect from seller", "cents": 0}
+    else:
+        rates = await quote(s, delivery, p)
+        rate = next((r for r in rates if r["code"] == body.get("service_level_code")), None)
+        if not rate:
+            raise ApiError("That delivery option is no longer available, please refresh the rates")
 
     fee_pct = float(os.environ.get("PLATFORM_FEE_PERCENT", "5"))
     item_cents = round(float(p["price"]) * 100)
@@ -299,13 +321,36 @@ async def create_payment(request: Request):
         ("name_first", first), ("name_last", last.strip()),
         ("email_address", buyer), ("cell_number", phone),
         ("m_payment_id", order_id), ("amount", money(total_cents)),
-        ("item_name", title), ("item_description", f"Delivery: {rate['name']}"[:255]),
+        ("item_name", title), ("item_description", ("Collect from seller" if collect else f"Delivery: {rate['name']}")[:255]),
         ("setup", setup),
     ]
     signature = pf_signature(pairs, os.environ.get("PAYFAST_PASSPHRASE", ""))
     return {"action": f"https://{pf_host()}/eng/process",
             "fields": [[k, v] for k, v in pairs if v != ""] + [["signature", signature]],
             "order_id": order_id}
+
+
+@app.post("/order-contact")
+async def order_contact(request: Request):
+    """After paying for a collection order, the buyer gets the seller's contact + pickup spot."""
+    buyer = await current_buyer(request)
+    order_id = str((await request.json()).get("order_id", ""))
+    if not UUID_RE.match(order_id):
+        raise ApiError("Order not found", 404)
+    rows = await sb("GET", "orders", params={"id": f"eq.{order_id}", "buyer_email": f"eq.{buyer}", "select": "*"})
+    if not rows:
+        raise ApiError("Order not found", 404)
+    o = rows[0]
+    if o["status"] != "paid":
+        raise ApiError("This order isn't paid yet")
+    if o["service_level_code"] != "COLLECT":
+        raise ApiError("Contact details are only shared for collection orders")
+    s = await sb("GET", "seller_profiles", params={"seller_email": f"eq.{o['seller_email']}", "select": "*"})
+    if not s:
+        raise ApiError("Seller details not found", 404)
+    s = s[0]
+    return {"name": s["full_name"], "phone": s["phone"], "email": s["seller_email"],
+            "pickup": f"{s['street_address']}, {s['local_area']}, {s['city']}"}
 
 
 @app.post("/payfast-itn")
@@ -363,7 +408,17 @@ async def payfast_itn(request: Request):
             return PlainTextResponse("OK")
         await sb("PATCH", "products", params={"id": f"eq.{o['product_id']}"}, body={"status": "Sold"})
 
-        # 5. Book the Courier Guy collection
+        # 5a. Collection orders: nothing to ship
+        if o["service_level_code"] == "COLLECT":
+            await sb("PATCH", "orders", params={"id": f"eq.{o['id']}"},
+                     body={"tracking_reference": "COLLECT FROM SELLER"})
+            return PlainTextResponse("OK")
+
+        # 5b. Book the Courier Guy collection (flat-rate orders are booked by hand)
+        if o["service_level_code"] == "FLAT" or not courier_live():
+            await sb("PATCH", "orders", params={"id": f"eq.{o['id']}"},
+                     body={"courier_error": "MANUAL BOOKING NEEDED (flat-rate delivery)"})
+            return PlainTextResponse("OK")
         try:
             prod = (await sb("GET", "products", params={"id": f"eq.{o['product_id']}", "select": "category"}))[0]
             seller = (await sb("GET", "seller_profiles",
