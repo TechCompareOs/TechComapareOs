@@ -1,7 +1,7 @@
 // === SUPABASE INITIALIZATION ===
 const SUPABASE_URL = "https://hizmjehkwbgmrlxezvcl.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_NvyZ8UYqTfZ5kQOhI87z0w_tOBpX9Ha";
-const PAYMENTS_API = 'https://your-service-name.onrender.com'; //Python payments server URL
+const PAYMENTS_API = 'https://techcomapareos.onrender.com';
 const IMAGE_BUCKET = 'product-images';
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB
 const LISTING_DAYS = 30;                 // a listing stays live this long unless the seller renews it
