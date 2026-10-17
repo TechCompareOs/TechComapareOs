@@ -61,28 +61,6 @@ async def health():
     return {"ok": True}
 
 
-@app.get("/debug-db")
-async def debug_db():
-    """Temporary self-test. Shows no secrets. DELETE this route once payments work."""
-    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
-    out = {
-        "key_type": "sb_secret" if key.strip().startswith("sb_secret_")
-        else "legacy_jwt" if key.strip().startswith("eyJ") else "unrecognised",
-        "key_length": len(key),
-        "key_has_whitespace": key != key.strip() or " " in key or "\n" in key,
-        "supabase_url_host": (os.environ.get("SUPABASE_URL", "").split("//")[-1]).split("/")[0],
-        "tables": {},
-    }
-    for t in ("products", "seller_profiles", "orders"):
-        try:
-            r = await http.get(f"{env('SUPABASE_URL')}/rest/v1/{t}", params={"select": "*", "limit": "1"},
-                               headers=_sb_headers())
-            out["tables"][t] = r.status_code
-        except Exception as e:
-            out["tables"][t] = f"error: {type(e).__name__}"
-    return out
-
-
 # ---------------------------------------------------------------- Supabase
 def _sb_headers(prefer: str | None = None) -> dict:
     key = env("SUPABASE_SERVICE_ROLE_KEY").strip()
